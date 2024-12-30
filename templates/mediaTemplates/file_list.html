@@ -1,0 +1,50 @@
+<!-- templates/home.html-->
+{% extends 'base.html' %}
+
+
+{% block content %}
+  <h2>General Files</h2>
+  <p>
+    <p><a href="{% url 'home' %}">Home</a><p>
+    <a href="{% url 'upload' %}" class="btn btn-primary">Upload File</a>
+  </p>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Icon</th>
+        <th>File Name</th>
+        <th>Description</th>
+        <th>Owner</th>
+        <th>Download</th>
+        <th>Delete</th>
+
+      </tr>
+    </thead>
+    <tbody>
+      {% for file in files %}
+        {% if file.owner == user.username %}
+          <tr>
+            <td>
+              {% if file.icon %}
+                <img src="{{ file.icon.url }}" alt="{{ file.filename }}" style="width:100px;">
+              {% else %}
+                <span class="text-muted">No Icon</span>
+              {% endif %}
+            </td>
+            <td>{{ file.filename }}</td>
+            <td>{{ file.description }}</td>
+            <td>{{ file.owner }}</td>
+            <td>
+              <a href="{{ file.file.url }}" class="btn btn-primary btn-sm" target="_blank">
+                Download
+              </a>
+            </td>
+            <td>
+              <a href="{% url 'delete_file' file.pk %}" class="btn btn-danger btm-sm">Delete File</a>
+            </td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

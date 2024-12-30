@@ -1,0 +1,48 @@
+<!-- templates/home.html-->
+{% extends 'base.html' %}
+
+{% load crispy_forms_tags %}
+
+{% block content %}
+  <h2>Images</h2>
+  <p>
+    <p><a href="{% url 'home' %}">Home</a><p>
+    <a href="{% url 'upload_image' %}" class="btn btn-primary">Upload Image</a>
+  </p>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Thumbnail</th>
+        <th>Title</th>
+        <th>Author</th>
+        <th>Description</th>
+        <th>Owner</th>
+        <th>Download</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for image in images %}
+        {% if image.owner == user.username %}
+          <tr>
+            <td>
+              {% if image.thumbnail %}
+                <img src="{{ image.thumbnail.url }}" alt="{{ image.title }}" style="width:100px;">
+              {% else %}
+                <span class="text-muted">No Thumbnail</span>
+              {% endif %}
+            </td>
+            <td>{{ image.title }}</td>
+            <td>{{ image.author }}</td>
+            <td>{{ image.descriptions }}</td>
+            <td>{{ image.owner }}</td>
+            <td>
+              <a href="{{ image.file.url }}" class="btn btn-primary btn-sm" target="_blank">
+                Download
+              </a>
+            </td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
