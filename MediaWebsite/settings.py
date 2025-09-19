@@ -152,8 +152,10 @@ STATICFILES_DIRS = [
 ]
 
 # Let Django find the built index.html as a template:
-TEMPLATES[0]['DIRS'] = [BASE_DIR / 'frontend' / 'dist']
-
+TEMPLATES[0]["DIRS"] = [
+    BASE_DIR / "frontend" / "dist",   # React entry (index.html)
+    BASE_DIR / "templates",           # <-- add this if you have project-level templates
+]
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'data')
 MEDIA_URL = '/data/'
