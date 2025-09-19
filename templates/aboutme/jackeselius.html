@@ -69,7 +69,7 @@
     .badge{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:12px; border:1px solid var(--border); background:var(--card); font-size:12px}
 
     /* Dancing mascot */
-    .mascot{position:fixed; bottom:20px; right:20px; width:80px; height:80px; animation:dance 2s infinite; z-index:1000}
+    .mascot{position:fixed; bottom:20px; right:20px; width:90px; height:90px; animation:dance 2s infinite; z-index:1000}
     @keyframes dance{
       0%,100%{transform:translateY(0) rotate(0deg)}
       25%{transform:translateY(-10px) rotate(-10deg)}
@@ -91,8 +91,133 @@
 </head>
 <body>
   <div class="wrap">
-    <!-- existing resume content unchanged -->
-    ... (resume content stays as is) ...
+    <header>
+      <div class="title">
+        <div class="avatar" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" opacity=".25"/>
+            <path d="M8 9l4 2.25L16 9m-8 3.5l4 2.25 4-2.25"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Jack Eselius</h1>
+          <div class="subtitle">Analytics Engineer & Full‑Stack Developer</div>
+          <div class="pills" aria-label="Key strengths">
+            <span class="pill">Snowflake SQL</span>
+            <span class="pill">Tableau</span>
+            <span class="pill">Python (pandas)</span>
+            <span class="pill">Django + React</span>
+            <span class="pill">OCI • Linux • Apache</span>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" onclick="window.print()">Download PDF</button>
+        <button class="btn" id="themeToggle" aria-pressed="false">Toggle Theme</button>
+        <button class="btn" id="mascotToggle" aria-pressed="true">Hide Penguin</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <main class="card">
+        <h2>Profile</h2>
+        <p class="summary">Data‑driven builder with a track record of turning messy operational data into reliable dashboards, automations, and web tools. Comfortable across the stack: Snowflake SQL &amp; Python for pipelines, Tableau for insight delivery, and Django+React for apps. I like shipping pragmatic solutions fast, then hardening with tests, docs, and observability.</p>
+
+        <h2>Experience</h2>
+        <section class="timeline">
+          <article class="item">
+            <div class="dot" aria-hidden="true"></div>
+            <div>
+              <div class="when">2023 — Present · New York, NY</div>
+              <div class="role">Analytics Engineer / Data Viz</div>
+              <div class="company">Aviation Operations (Crew Planning &amp; Absence Analytics)</div>
+              <ul class="bullets">
+                <li>Built Snowflake models &amp; Tableau dashboards for absence rates, utilization, and staffing forecasts used by leadership for daily decisions.</li>
+                <li>Authored complex SQL (CTEs, pivots, role‑month expansion, time‑bounded joins) with data quality checks and performance tuning.</li>
+                <li>Automated Excel → Snowflake ingestion with Python (pandas/openpyxl), including file parsing, tab transposition, and metadata tagging.</li>
+                <li>Prototyped anomaly alerts and forecasting with Isolation Forest + seasonal effects; integrated outputs into Tableau.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="item">
+            <div class="dot" aria-hidden="true"></div>
+            <div>
+              <div class="when">2022 — Present</div>
+              <div class="role">Full‑Stack Developer (Personal Projects)</div>
+              <div class="company">Django • React • OCI • Apache</div>
+              <ul class="bullets">
+                <li>Deployed a secure Django site on OCI Free Tier (Ubuntu, Apache + mod_wsgi, SSL), with media storage and user auth.</li>
+                <li>Implemented CI‑style deploy scripts pulling from GitHub; tuned vhosts, static/media aliases, and firewall rules.</li>
+                <li>Built React front‑ends for dashboards and content views; experimented with Tailwind and component libraries.</li>
+              </ul>
+            </div>
+          </article>
+        </section>
+
+        <h2>Projects</h2>
+        <section class="timeline">
+          <article class="item">
+            <div class="dot"></div>
+            <div>
+              <div class="role">Crew Absence Intelligence</div>
+              <div class="company">Snowflake • Tableau • Python</div>
+              <ul class="bullets">
+                <li>Daily absence &amp; duty‑based denominators with YoY overlays and holiday/weekend effects.</li>
+                <li>Predictive flags for unusual spikes; email/Slack‑ready alert outputs.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="item">
+            <div class="dot"></div>
+            <div>
+              <div class="role">Staffing Model Automation</div>
+              <div class="company">pandas • openpyxl • Snowflake</div>
+              <ul class="bullets">
+                <li>Parser that ingests multi‑tab Excel workbooks, standardizes headers, and appends metadata for lineage.</li>
+                <li>Exports clean tables for downstream analytics; reduced prep time from hours to minutes.</li>
+              </ul>
+            </div>
+          </article>
+        </section>
+      </main>
+
+      <aside class="card">
+        <h2>Contact</h2>
+        <div class="list" aria-label="Contact methods">
+          <div class="row"><span class="label">Email</span> <a href="mailto:egstudios3011@gmail.com">egstudios3011@gmail.com</a></div>
+          <div class="row"><span class="label">Website</span> <a href="https://egmedia.org" target="_blank" rel="noopener">egmedia.org</a></div>
+          <div class="row"><span class="label">Location</span> <span class="muted">United States (EST)</span></div>
+        </div>
+
+        <h2>Skills</h2>
+        <div class="pills">
+          <span class="pill">Snowflake • SQL</span>
+          <span class="pill">Python • pandas</span>
+          <span class="pill">Tableau</span>
+          <span class="pill">Django</span>
+          <span class="pill">React</span>
+          <span class="pill">Linux • Apache</span>
+          <span class="pill">Version Control (Git)</span>
+        </div>
+
+        <h2>Education</h2>
+        <div class="list">
+          <div>
+            <div><strong>Your Degree</strong></div>
+            <div class="muted">Your University — YYYY</div>
+          </div>
+        </div>
+
+        <h2>Certs & Highlights</h2>
+        <ul class="bullets" style="padding-left:18px;margin-top:8px">
+          <li>Built and maintained production Apache vhosts with SSL (Namecheap certs) on OCI.</li>
+          <li>Performance tuning for heavy SQL (window funcs, pivots, date logic).</li>
+          <li>Obs: logs, health checks, deploy scripts, and backups.</li>
+        </ul>
+      </aside>
+    </div>
+
     <footer>
       <div class="badge" title="Open‑source friendly">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
@@ -102,12 +227,37 @@
     </footer>
   </div>
 
-  <!-- Dancing penguin mascot -->
-  <div class="mascot" title="Happy Penguin">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Tux.svg" alt="Dancing Penguin" style="width:100%;height:100%"/>
+  <!-- Dancing penguin mascot (inline SVG to avoid external loading issues) -->
+  <div class="mascot" id="penguin" aria-hidden="false">
+    <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Dancing Penguin">
+      <defs>
+        <radialGradient id="g" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#dbe8ff" stop-opacity="0.2"/>
+        </radialGradient>
+      </defs>
+      <!-- body -->
+      <ellipse cx="64" cy="70" rx="34" ry="40" fill="#0f172a"/>
+      <!-- belly -->
+      <ellipse cx="64" cy="78" rx="22" ry="28" fill="url(#g)"/>
+      <!-- face white -->
+      <ellipse cx="64" cy="54" rx="18" ry="16" fill="#eef2ff"/>
+      <!-- eyes -->
+      <circle cx="57" cy="52" r="3" fill="#0b0c10"/>
+      <circle cx="71" cy="52" r="3" fill="#0b0c10"/>
+      <!-- beak -->
+      <path d="M58 59 L70 59 L64 65 Z" fill="#f59e0b"/>
+      <!-- wings -->
+      <path d="M30 70 q-10 5 -8 18 q10 2 18 -6" fill="#0f172a"/>
+      <path d="M98 70 q10 5 8 18 q-10 2 -18 -6" fill="#0f172a"/>
+      <!-- feet -->
+      <ellipse cx="54" cy="108" rx="10" ry="6" fill="#f59e0b"/>
+      <ellipse cx="74" cy="108" rx="10" ry="6" fill="#f59e0b"/>
+    </svg>
   </div>
 
   <script>
+    // Updated date
     (function(){
       var d = new Date();
       var fmt = d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'2-digit'});
@@ -115,6 +265,7 @@
       if (el) el.textContent = fmt;
     })();
 
+    // Theme toggle (dark <-> light)
     const btn = document.getElementById('themeToggle');
     let light = false;
     function setLight(on){
@@ -129,6 +280,18 @@
     }
     if(btn){
       btn.addEventListener('click',()=>{ setLight(!light); btn.setAttribute('aria-pressed', String(light)); });
+    }
+
+    // Mascot toggle (show/hide)
+    const mbtn = document.getElementById('mascotToggle');
+    const penguin = document.getElementById('penguin');
+    if(mbtn && penguin){
+      mbtn.addEventListener('click',()=>{
+        const hidden = penguin.style.display === 'none';
+        penguin.style.display = hidden ? 'block' : 'none';
+        mbtn.textContent = hidden ? 'Hide Penguin' : 'Show Penguin';
+        mbtn.setAttribute('aria-pressed', String(hidden));
+      });
     }
   </script>
 </body>
