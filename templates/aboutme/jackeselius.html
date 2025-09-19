@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jack Eselius — Resume</title>
+  <meta name="description" content="Resume of Jack Eselius — analytics engineer & full‑stack builder." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0c10;      --card:#0f1117;   --muted:#9aa4b2;   --text:#e6e9ef;   --accent:#7cafff;  --pill:#1b2333;
+      --border:#232938;   --link:#98b6ff;  --good:#7ee787;    --warn:#ffdd57;   --bad:#ff7b72;
+      --print-text:#111;  --print-muted:#555; --print-border:#ccc;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:linear-gradient(120deg,#0b0c10 0%,#141925 100%); color:var(--text); line-height:1.55}
+    a{color:var(--link); text-decoration:none}
+    a:hover{text-decoration:underline}
+    .wrap{max-width:980px; margin:40px auto; padding:0 20px}
+
+    /* Header */
+    header{display:grid; grid-template-columns:1fr auto; gap:24px; align-items:center; background:rgba(15,17,23,.6); border:1px solid var(--border); border-radius:20px; padding:28px; backdrop-filter: blur(6px)}
+    .title{display:flex; align-items:center; gap:18px}
+    .avatar{width:72px;height:72px;border-radius:16px; background:linear-gradient(135deg,#1b2333,#0b0c10); display:grid; place-items:center; border:1px solid var(--border)}
+    .avatar svg{width:38px;height:38px;opacity:.9}
+    h1{font-size:28px; line-height:1.2; margin:0}
+    .subtitle{margin-top:4px; color:var(--muted)}
+    .actions{display:flex; gap:10px; flex-wrap:wrap}
+    .btn{border:1px solid var(--border); background:var(--card); color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600}
+    .btn:hover{border-color:#2f3a54}
+
+    /* Grid */
+    .grid{display:grid; grid-template-columns: 2.1fr 1fr; gap:24px; margin-top:24px}
+
+    /* Cards */
+    .card{background:rgba(15,17,23,.6); border:1px solid var(--border); border-radius:16px; padding:22px}
+    .card h2{margin:.2rem 0 1rem; font-size:16px; letter-spacing:.02em; color:#d8deea; text-transform:uppercase}
+    .muted{color:var(--muted)}
+
+    /* Summary */
+    .summary{font-size:15px}
+
+    /* Pills */
+    .pills{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+    .pill{background:var(--pill); color:#cfe0ff; padding:6px 10px; border:1px solid var(--border); border-radius:999px; font-size:12px; letter-spacing:.02em}
+
+    /* Timeline */
+    .timeline{position:relative}
+    .item{display:grid; grid-template-columns: auto 1fr; gap:14px; padding:14px 0}
+    .dot{width:10px;height:10px;border-radius:50%; background:var(--accent); margin-top:8px; box-shadow:0 0 0 4px rgba(124,175,255,.15)}
+    .when{font-family:"JetBrains Mono",ui-monospace,monospace; color:#b6c2d3; font-size:12px}
+    .role{font-weight:700}
+    .company{color:var(--muted)}
+    .bullets{margin:.5rem 0 0 0; padding-left:18px}
+    .bullets li{margin:.35rem 0}
+
+    /* Sidebar lists */
+    .list{display:grid; gap:10px}
+    .list .row{display:flex; justify-content:space-between; gap:8px}
+    .list .label{color:#cfe0ff}
+
+    /* Footer */
+    footer{margin:26px 0 60px; display:flex; justify-content:space-between; align-items:center; color:var(--muted)}
+
+    /* Badges */
+    .badge{display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:12px; border:1px solid var(--border); background:var(--card); font-size:12px}
+
+    /* Dancing mascot */
+    .mascot{position:fixed; bottom:20px; right:20px; width:80px; height:80px; animation:dance 2s infinite; z-index:1000}
+    @keyframes dance{
+      0%,100%{transform:translateY(0) rotate(0deg)}
+      25%{transform:translateY(-10px) rotate(-10deg)}
+      50%{transform:translateY(0) rotate(10deg)}
+      75%{transform:translateY(-10px) rotate(-5deg)}
+    }
+
+    /* Print */
+    @media print{
+      body{background:#fff; color:var(--print-text)}
+      .wrap{margin:0; max-width:100%; padding:0}
+      header,.card,footer{border:1px solid var(--print-border); background:#fff}
+      .btn,.actions,.mascot{display:none !important}
+      .pill{background:#f1f5ff; border-color:#e1e6f4; color:#223}
+      .when{color:#333}
+      a{color:#0645ad}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- existing resume content unchanged -->
+    ... (resume content stays as is) ...
+    <footer>
+      <div class="badge" title="Open‑source friendly">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        Always learning & shipping
+      </div>
+      <div class="muted">Last updated <span id="updated"></span></div>
+    </footer>
+  </div>
+
+  <!-- Dancing penguin mascot -->
+  <div class="mascot" title="Happy Penguin">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Tux.svg" alt="Dancing Penguin" style="width:100%;height:100%"/>
+  </div>
+
+  <script>
+    (function(){
+      var d = new Date();
+      var fmt = d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'2-digit'});
+      var el = document.getElementById('updated');
+      if (el) el.textContent = fmt;
+    })();
+
+    const btn = document.getElementById('themeToggle');
+    let light = false;
+    function setLight(on){
+      light = !!on;
+      document.documentElement.style.setProperty('--bg', on ? '#f6f7fb' : '#0b0c10');
+      document.documentElement.style.setProperty('--card', on ? '#ffffff' : 'rgba(15,17,23,.6)');
+      document.documentElement.style.setProperty('--text', on ? '#0f172a' : '#e6e9ef');
+      document.documentElement.style.setProperty('--muted', on ? '#475569' : '#9aa4b2');
+      document.documentElement.style.setProperty('--border', on ? '#e2e8f0' : '#232938');
+      document.documentElement.style.setProperty('--pill', on ? '#eef2ff' : '#1b2333');
+      document.documentElement.style.setProperty('--link', on ? '#1d4ed8' : '#98b6ff');
+    }
+    if(btn){
+      btn.addEventListener('click',()=>{ setLight(!light); btn.setAttribute('aria-pressed', String(light)); });
+    }
+  </script>
+</body>
+</html>

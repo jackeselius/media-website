@@ -15,7 +15,9 @@ def aboutme(request):
 
 
 def Jack_Eselius(request):
-    return HttpResponse("Jack Eselius")
+    #return HttpResponse("Jack Eselius")
+    return render(request, 'aboutme/jackeselius.html')
+
 
 def Gage_Condon(request):
     return HttpResponse("Gage Condon")
