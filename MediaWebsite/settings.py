@@ -25,10 +25,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-_w0c@854*4a^bf0g^4hptv6q=+r%)_%$o63c(+)!_su^-vos5+'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True #With debug turned off Django won't handle static files for you any more - your production web server (Apache or something) should take care of that.
+DEBUG = False #With debug turned off Django won't handle static files for you any more - your production web server (Apache or something) should take care of that.
 
-#ALLOWED_HOSTS = ['68.162.213.6', 'www.jackeseli.us']
-ALLOWED_HOSTS=['*']
+#ALLOWED_HOSTS = ['egmedia.org', 'www.egmedia.org', '129.153.24.142']
+#ALLOWED_HOSTS=['*']
+ALLOWED_HOSTS = ["egmedia.org", "www.egmedia.org"]
 
 # Application definition
 
@@ -45,7 +46,8 @@ INSTALLED_APPS = [
     'media',
     'aboutme',
     'homepage',
-    #'rest_framework',
+    'rest_framework',
+    'corsheaders',
 
 ]
 
@@ -53,6 +55,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap4"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -88,16 +91,14 @@ WSGI_APPLICATION = 'MediaWebsite.wsgi.application'
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "mssql",
-        "NAME": "db0_media_site",
-        "USER": "SA",
-        "PASSWORD": "Homepodwoodpanel64!",
-        "HOST": "68.162.213.6",
-        "PORT": "14330",
-        "OPTIONS": {"driver": "ODBC Driver 17 for SQL Server",
-        },
-    },
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'media_website_main_db',
+        'USER': 'media_website_admin',
+        'PASSWORD': 'puffDaddyBugsy3011!',
+        'HOST': '10.0.0.23',   # Private IP of your DB server
+        'PORT': '5432',
+    }
 }
 
 
@@ -146,11 +147,47 @@ LOGOUT_REDIRECT_URL = "home"
 
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, "static/")
+STATICFILES_DIRS = [
+    BASE_DIR / 'frontend' / 'dist',      # include built React assets
+]
 
-MEDIA_ROOT = os.path.join(BASE_DIR, 'uploaded')
-MEDIA_URL = '/uploaded/'
+# Let Django find the built index.html as a template:
+TEMPLATES[0]['DIRS'] = [BASE_DIR / 'frontend' / 'dist']
 
-REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10
-}
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'data')
+MEDIA_URL = '/data/'
+
+#REST_FRAMEWORK = {
+#    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+#    'PAGE_SIZE': 10
+#}
+
+
+#SECURITY
+CSRF_TRUSTED_ORIGINS = [
+    "https://egmedia.org",
+    "https://www.egmedia.org",
+]
+
+if DEBUG:
+    ALLOWED_HOSTS += ["localhost", "127.0.0.1"]
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+    CORS_ALLOW_CREDENTIALS = True
+else:
+    CORS_ALLOWED_ORIGINS = []        # optional (default is empty)
+    # CORS_ALLOW_ALL_ORIGINS = False # explicit, if you like
+
+# Cookies & HTTPS hardening (good defaults)
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE   = not DEBUG
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE    = "Lax"
+SECURE_SSL_REDIRECT     = not DEBUG
+CSRF_COOKIE_HTTPONLY    = False  # keep False if your JS reads csrftoken cookie
+
+# If Django sits behind a reverse proxy/ELB that terminates TLS, also add:
+# SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
