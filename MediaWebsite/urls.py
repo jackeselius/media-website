@@ -23,16 +23,13 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.api.urls')),  # Auth API (login/logout/user)
-    path('media/', include('media.urls')),
     path('api/media/', include('media.api.urls')),
-    path("aboutme/", include("aboutme.urls")),
+    # Removed legacy server-rendered routes for media/aboutme
     # Serve the React SPA entry for the root path
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
 
     # Catch-all for client-side routes (exclude API/admin/static/media/accounts/router prefixes)
-    re_path(r'^(?!admin/|accounts/|media/|static/|router/).*$', TemplateView.as_view(template_name='index.html'), name='spa'),
-
-    path('router/', include('quickstart.urls')),
+    re_path(r'^(?!admin/|static/|api/).*$', TemplateView.as_view(template_name='index.html'), name='spa'),
 ]
 
 if settings.DEBUG:

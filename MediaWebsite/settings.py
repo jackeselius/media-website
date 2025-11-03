@@ -44,8 +44,6 @@ INSTALLED_APPS = [
     #'crispy_bootstrap4', #need to pip install crispy-bootstrap4
     'accounts',
     'media',
-    'aboutme',
-    'homepage',
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',

@@ -16,7 +16,8 @@ import { GageCondonPage } from './pages/GageCondon';
 import { DikshaThachPage } from './pages/DikshaThach';
 import { KateEseliusPage } from './pages/KateEselius';
 import { LoginPage } from './pages/Login';
-import { SignupPage } from './pages/Signup';
+// Signup is disabled; keep route redirected to login to avoid dead links
+import { Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 
 const router = createBrowserRouter([
@@ -70,7 +71,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'signup',
-        element: <SignupPage />,
+        element: <Navigate to="/login" replace />,
       },
     ],
   },
