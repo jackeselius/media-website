@@ -129,6 +129,110 @@ server {
 }
 ```
 
+## Web server (Apache httpd) outline
+
+If you use Apache instead of nginx, you can deploy either with mod_wsgi (embedding Django directly in Apache) or by proxying to a separate app server (gunicorn/uvicorn). Examples below—adjust paths to match your server layout.
+
+### Option 1: mod_wsgi (recommended for a simple stack)
+
+```apache
+# Redirect HTTP to HTTPS
+<VirtualHost *:80>
+  ServerName egmedia.org
+  ServerAlias www.egmedia.org
+  Redirect / https://egmedia.org/
+</VirtualHost>
+
+<VirtualHost *:443>
+  ServerName egmedia.org
+  ServerAlias www.egmedia.org
+
+  SSLEngine on
+  # SSLCertificateFile /etc/letsencrypt/live/egmedia.org/fullchain.pem
+  # SSLCertificateKeyFile /etc/letsencrypt/live/egmedia.org/privkey.pem
+
+  # Static assets (React build + collected static)
+  Alias /static/ "/srv/media-website/static/"
+  <Directory "/srv/media-website/static/">
+    Require all granted
+  </Directory>
+
+  # Media uploads
+  Alias /data/ "/srv/media-website/data/"
+  <Directory "/srv/media-website/data/">
+    Require all granted
+  </Directory>
+
+  # Django via mod_wsgi
+  WSGIDaemonProcess mediawebsite python-home=/srv/media-website/venv python-path=/srv/media-website
+  WSGIProcessGroup mediawebsite
+  WSGIScriptAlias / /srv/media-website/MediaWebsite/wsgi.py
+  <Directory "/srv/media-website/MediaWebsite">
+    <Files wsgi.py>
+      Require all granted
+    </Files>
+  </Directory>
+
+  # Forward original host/proto details to Django (useful for building absolute URLs)
+  RequestHeader set X-Forwarded-Proto https env=HTTPS
+  RequestHeader set X-Forwarded-Host "%{HOST}s"
+
+  ErrorLog ${APACHE_LOG_DIR}/mediawebsite-error.log
+  CustomLog ${APACHE_LOG_DIR}/mediawebsite-access.log combined
+</VirtualHost>
+```
+
+Notes:
+- Install `libapache2-mod-wsgi-py3` (Debian/Ubuntu) and enable it: `a2enmod wsgi`.
+- Ensure the `python-home` points to your virtualenv and `python-path` to the project root.
+- Run `collectstatic` so `/static/` is populated.
+
+### Option 2: Reverse proxy to an app server (gunicorn/uvicorn)
+
+```apache
+<VirtualHost *:80>
+  ServerName egmedia.org
+  ServerAlias www.egmedia.org
+  Redirect / https://egmedia.org/
+</VirtualHost>
+
+<VirtualHost *:443>
+  ServerName egmedia.org
+  ServerAlias www.egmedia.org
+
+  SSLEngine on
+  # SSLCertificateFile /etc/letsencrypt/live/egmedia.org/fullchain.pem
+  # SSLCertificateKeyFile /etc/letsencrypt/live/egmedia.org/privkey.pem
+
+  Alias /static/ "/srv/media-website/static/"
+  <Directory "/srv/media-website/static/">
+    Require all granted
+  </Directory>
+
+  Alias /data/ "/srv/media-website/data/"
+  <Directory "/srv/media-website/data/">
+    Require all granted
+  </Directory>
+
+  ProxyPreserveHost On
+  ProxyPass        / http://127.0.0.1:8000/
+  ProxyPassReverse / http://127.0.0.1:8000/
+  RequestHeader set X-Forwarded-Proto https env=HTTPS
+
+  ErrorLog ${APACHE_LOG_DIR}/mediawebsite-error.log
+  CustomLog ${APACHE_LOG_DIR}/mediawebsite-access.log combined
+</VirtualHost>
+```
+
+Enable required modules (Debian/Ubuntu):
+
+```bash
+a2enmod ssl headers proxy proxy_http rewrite
+systemctl reload apache2
+```
+
+Either approach works—the choice is operational. mod_wsgi keeps everything in Apache; reverse-proxy lets you manage the app process (gunicorn/uvicorn) separately via systemd.
+
 ## Deployment guide
 
 There are two supported patterns—pick one per environment.
