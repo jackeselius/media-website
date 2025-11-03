@@ -14,8 +14,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized (redirect to login)
-      window.location.href = '/accounts/login/';
+      // Handle unauthorized (redirect to SPA login)
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

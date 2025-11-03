@@ -17,6 +17,7 @@ import { DikshaThachPage } from './pages/DikshaThach';
 import { KateEseliusPage } from './pages/KateEselius';
 import { LoginPage } from './pages/Login';
 import { SignupPage } from './pages/Signup';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
 
 const router = createBrowserRouter([
   {
@@ -33,7 +34,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'upload',
-        element: <UploadPage />,
+        element: (
+          <ProtectedRoute>
+            <UploadPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'about',
