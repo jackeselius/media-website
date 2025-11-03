@@ -25,6 +25,10 @@ NPM_BIN="${NPM_BIN:-npm}"
 # Option: copy built index.html into Django templates (safe default ON)
 COPY_INDEX_TO_TEMPLATES=1
 
+# Option: attempt to install Node/npm automatically on Ubuntu/Debian when missing
+# This is opt-in via --install-node to avoid unexpected system changes.
+INSTALL_NODE=0
+
 # Frontend build logging
 PRIMARY_LOG="/var/log/mediawebsite-frontend.build.log"
 FALLBACK_LOG="$APP_DIR/frontend.build.log"
@@ -45,6 +49,7 @@ Usage: $(basename "$0") [options]
 Options:
   --no-frontend           Skip building React/Vite frontend.
   --no-copy-index         Don't copy frontend/dist/index.html into Django templates.
+  --install-node          Attempt to install Node/npm (NodeSource) on Debian/Ubuntu if missing (opt-in).
   Other options are same as the original deploy script (--branch, --app-dir, --venv, etc).
 USAGE
 }
@@ -57,6 +62,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-frontend) FRONTEND_BUILD=0; shift;;
     --no-copy-index) COPY_INDEX_TO_TEMPLATES=0; shift;;
+  --install-node) INSTALL_NODE=1; shift;;
     --frontend-dir) FRONTEND_DIR="$2"; shift 2;;
     --branch) BRANCH="$2"; shift 2;;
     --app-dir) APP_DIR="$2"; VENV="${APP_DIR}/mediasite_env"; shift 2;;
@@ -98,42 +104,66 @@ else
   log "No requirements.txt found; skipping pip install"
 fi
 
-# Build frontend
+### Build frontend
 if [[ $FRONTEND_BUILD -eq 1 && -d "$FRONTEND_DIR" ]]; then
-  if command -v "$NPM_BIN" >/dev/null 2>&1; then
-    if command -v node >/dev/null 2>&1; then
-      NV_RAW="$(node -v)"
-      NV="${NV_RAW#v}"
-      IFS='.' read -r MAJOR MINOR PATCH <<<"$NV"
-
-      ok=0
-      if   (( MAJOR > 22 )); then ok=1
-      elif (( MAJOR == 22 && MINOR >= REQ2_MINOR )); then ok=1
-      elif (( MAJOR == 21 )); then ok=1
-      elif (( MAJOR == 20 && MINOR >= REQ1_MINOR )); then ok=1
-      fi
-
-      if (( ok == 0 )); then
-        log "Node $NV_RAW is too old for Vite; aborting frontend build."
-        exit 4
+  # Ensure npm/node are available; optionally attempt to install Node if requested
+  if ! command -v "$NPM_BIN" >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
+    if [[ $INSTALL_NODE -eq 1 ]]; then
+      log "npm or node not found — attempting to install Node (NodeSource)"
+      # Try Debian/Ubuntu NodeSource installer (requires sudo)
+      if command -v apt-get >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+        log "Running NodeSource setup for Node 20.x"
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt-get install -y nodejs build-essential || true
       else
-        log "Node version OK: $NV_RAW"
+        log "Automatic Node install not supported on this OS; please install Node/npm manually."
       fi
     else
-      log "Node not found in PATH; cannot build frontend."; exit 4
+      log "Node or npm not found in PATH; skipping frontend build. To auto-install, re-run with --install-node"
+      log "To continue deploy without frontend build use --no-frontend"
+    fi
+  fi
+
+  if command -v "$NPM_BIN" >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+    NV_RAW="$(node -v)"
+    NV="${NV_RAW#v}"
+    IFS='.' read -r MAJOR MINOR PATCH <<<"$NV"
+
+    ok=0
+    if   (( MAJOR > 22 )); then ok=1
+    elif (( MAJOR == 22 && MINOR >= REQ2_MINOR )); then ok=1
+    elif (( MAJOR == 21 )); then ok=1
+    elif (( MAJOR == 20 && MINOR >= REQ1_MINOR )); then ok=1
+    fi
+
+    if (( ok == 0 )); then
+      log "Node $NV_RAW is too old for Vite; aborting frontend build."
+      exit 4
+    else
+      log "Node version OK: $NV_RAW"
     fi
 
     log "Building frontend in $FRONTEND_DIR"
     pushd "$FRONTEND_DIR" >/dev/null
 
-    if [[ -f package-lock.json ]]; then
-      $NPM_BIN ci
-    else
-      $NPM_BIN install
-    fi
-
     mkdir -p "$(dirname "$BUILD_LOG")"
     log "Writing frontend build log to $BUILD_LOG"
+
+    # Prefer clean install (npm ci). If it fails (lockfile mismatch), fall back to npm install
+    if [[ -f package-lock.json ]]; then
+      log "Running: $NPM_BIN ci"
+      if $NPM_BIN ci 2>&1 | tee -a "$BUILD_LOG"; then
+        log "npm ci completed successfully"
+      else
+        log "npm ci failed; falling back to npm install and proceeding with build"
+        $NPM_BIN install 2>&1 | tee -a "$BUILD_LOG"
+      fi
+    else
+      log "No package-lock.json found; running npm install"
+      $NPM_BIN install 2>&1 | tee -a "$BUILD_LOG"
+    fi
+
+    log "Running frontend build"
     $NPM_BIN run build 2>&1 | tee -a "$BUILD_LOG"
 
     popd >/dev/null
@@ -157,9 +187,12 @@ if [[ $FRONTEND_BUILD -eq 1 && -d "$FRONTEND_DIR" ]]; then
     else
       log "Skipping copy of index.html to templates (--no-copy-index)"
     fi
-
   else
-    log "npm not found; skipping frontend build (install Node/npm or set NPM_BIN)"
+    if [[ $FRONTEND_BUILD -eq 0 ]]; then
+      log "Skipping frontend build (--no-frontend)"
+    else
+      log "No frontend directory at $FRONTEND_DIR; skipping frontend build or node/npm still missing"
+    fi
   fi
 else
   if [[ $FRONTEND_BUILD -eq 0 ]]; then
