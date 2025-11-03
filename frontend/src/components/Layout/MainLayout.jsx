@@ -27,7 +27,8 @@ export function MainLayout() {
       navbar={{
         width: 300,
         breakpoint: 'sm',
-        collapsed: { mobile: !opened }
+        // Hide navbar on desktop to avoid double menus; use burger on mobile
+        collapsed: { mobile: !opened, desktop: true }
       }}
       padding="md"
     >
@@ -47,7 +48,7 @@ export function MainLayout() {
                   />
                 ))}
               </Group>
-              <Group ml="xl">
+              <Group ml="xl" visibleFrom="sm">
                 {isAuthenticated ? (
                   <>
                     <Text size="sm">Welcome, {username}</Text>
@@ -67,14 +68,43 @@ export function MainLayout() {
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
+        {/* Navigation items for mobile */}
         {navigation.map((item) => (
           <NavLink
             key={item.path}
             label={item.label}
             active={location.pathname === item.path}
-            onClick={() => navigate(item.path)}
+            onClick={() => {
+              navigate(item.path);
+              setOpened(false);
+            }}
           />
         ))}
+        {/* Auth status and buttons for mobile */}
+        <NavLink
+          label={isAuthenticated ? `Welcome, ${username}` : "You are not logged in"}
+          disabled
+          style={{ marginTop: '1rem' }}
+        />
+        {isAuthenticated ? (
+          <NavLink
+            label="Logout"
+            onClick={() => {
+              handleLogout();
+              setOpened(false);
+            }}
+            style={{ marginTop: '0.5rem' }}
+          />
+        ) : (
+          <NavLink
+            label="Login"
+            onClick={() => {
+              navigate('/login');
+              setOpened(false);
+            }}
+            style={{ marginTop: '0.5rem' }}
+          />
+        )}
       </AppShell.Navbar>
 
       <AppShell.Main>

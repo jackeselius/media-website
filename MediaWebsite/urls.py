@@ -18,12 +18,11 @@ from django.urls import path, include, re_path
 from django.views.generic.base import TemplateView
 from django.conf import settings
 from django.conf.urls.static import static
-from rest_framework.authtoken.views import obtain_auth_token
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/auth/', include('accounts.api.urls')),  # New API endpoints
+    path('api/auth/', include('accounts.api.urls')),  # Auth API (login/logout/user)
     path('media/', include('media.urls')),
     path("aboutme/", include("aboutme.urls")),
     # Serve the React SPA entry for the root path
@@ -33,10 +32,6 @@ urlpatterns = [
     re_path(r'^(?!admin/|accounts/|media/|static/|router/).*$', TemplateView.as_view(template_name='index.html'), name='spa'),
 
     path('router/', include('quickstart.urls')),
-    
-    # API endpoints
-    path('api/auth/login/', obtain_auth_token, name='api_token_auth'),
-    path('api/auth/', include('accounts.api.urls')),
 ]
 
 if settings.DEBUG:
