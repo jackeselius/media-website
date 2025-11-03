@@ -1,7 +1,7 @@
-import { TextInput, PasswordInput, Button, Stack, Text } from '@mantine/core';
+import { TextInput, PasswordInput, Button, Stack, Text, Paper } from '@mantine/core';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export function LoginPage() {
   const [formData, setFormData] = useState({
@@ -10,15 +10,13 @@ export function LoginPage() {
   });
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post('/api/auth/login/', formData);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        navigate('/');
-      }
+      await login(formData);
+      navigate('/');
     } catch (err) {
       setError('Invalid username or password');
     }
