@@ -14,7 +14,8 @@ export function FileListPage() {
 
   const loadFiles = async () => {
     try {
-      const response = await api.get('/media/files/');
+      // Use JSON API instead of HTML template endpoint
+      const response = await api.get('/api/media/files/');
       // support both direct arrays and paginated responses with `results`
       const data = response.data;
       if (Array.isArray(data)) {
@@ -22,8 +23,10 @@ export function FileListPage() {
       } else if (data && Array.isArray(data.results)) {
         setFiles(data.results);
       } else {
-        // fallback: attempt to coerce to array if possible
-        setFiles(data || []);
+        // Unexpected shape (e.g., HTML error/redirect) — show error instead of breaking .map
+        setFiles([]);
+        setError('Unexpected response from server while loading files.');
+        console.error('Unexpected files payload:', data);
       }
       setError(null);
     } catch (err) {
@@ -40,7 +43,7 @@ export function FileListPage() {
     }
 
     try {
-      await api.delete(`/media/files/${fileId}/`);
+      await api.delete(`/api/media/files/${fileId}/`);
       await loadFiles(); // Reload the list
     } catch (err) {
       console.error('Error deleting file:', err);

@@ -25,7 +25,13 @@ export function UploadPage() {
       formData.append('file', values.file);
       formData.append('description', values.description);
 
-      await api.post('/media/upload/', formData, {
+      // Use API endpoint that accepts multipart form data
+      // Include filename (defaults on server if omitted)
+      if (values.file && values.file.name) {
+        formData.append('filename', values.file.name);
+      }
+
+      await api.post('/api/media/files/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

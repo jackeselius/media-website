@@ -24,6 +24,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.api.urls')),  # Auth API (login/logout/user)
     path('media/', include('media.urls')),
+    path('api/media/', include('media.api.urls')),
     path("aboutme/", include("aboutme.urls")),
     # Serve the React SPA entry for the root path
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
