@@ -16,8 +16,10 @@ export function MainLayout() {
 
   const navigation = [
     { label: 'Home', path: '/' },
-    { label: 'Files', path: '/files' },
-    ...(isAuthenticated ? [{ label: 'Upload', path: '/upload' }] : []),
+    ...(isAuthenticated ? [
+      { label: 'Files', path: '/files' },
+      { label: 'Upload', path: '/upload' },
+    ] : []),
     { label: 'About', path: '/about' },
   ];
 
