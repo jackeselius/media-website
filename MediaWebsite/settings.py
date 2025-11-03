@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-_w0c@854*4a^bf0g^4hptv6q=+r%)_%$o63c(+)!_su^-vos5+'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False #With debug turned off Django won't handle static files for you any more - your production web server (Apache or something) should take care of that.
+DEBUG = False  # Disabled for production
 
 #ALLOWED_HOSTS = ['egmedia.org', 'www.egmedia.org', '129.153.24.142']
 #ALLOWED_HOSTS=['*']
