@@ -15,7 +15,16 @@ export function FileListPage() {
   const loadFiles = async () => {
     try {
       const response = await api.get('/media/files/');
-      setFiles(response.data);
+      // support both direct arrays and paginated responses with `results`
+      const data = response.data;
+      if (Array.isArray(data)) {
+        setFiles(data);
+      } else if (data && Array.isArray(data.results)) {
+        setFiles(data.results);
+      } else {
+        // fallback: attempt to coerce to array if possible
+        setFiles(data || []);
+      }
       setError(null);
     } catch (err) {
       setError('Failed to load files');

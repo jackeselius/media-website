@@ -26,7 +26,8 @@ export function HomePage() {
     try {
       await api.post('/accounts/logout/');
       setUser(null);
-      window.location.href = '/accounts/login/';
+      // route to the SPA login page
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -54,7 +55,7 @@ export function HomePage() {
         <>
           <Text size="lg">You are not logged in</Text>
           <Group>
-            <Button component={Link} to="/accounts/login" variant="light">
+            <Button component={Link} to="/login" variant="light">
               Log In
             </Button>
             <Button component={Link} to="/about" variant="light">
