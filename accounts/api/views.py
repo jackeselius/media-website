@@ -6,6 +6,12 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError
 
 @api_view(['POST'])
+def logout_view(request):
+    if request.auth:  # If user has a token
+        request.auth.delete()  # Delete the token
+    return Response(status=status.HTTP_200_OK)
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def signup(request):
     try:

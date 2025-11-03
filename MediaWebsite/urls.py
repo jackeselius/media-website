@@ -23,8 +23,7 @@ from rest_framework.authtoken.views import obtain_auth_token
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path("accounts/", include("accounts.urls")),
-    path('accounts/', include('django.contrib.auth.urls')),
+    path('api/auth/', include('accounts.api.urls')),  # New API endpoints
     path('media/', include('media.urls')),
     path("aboutme/", include("aboutme.urls")),
     # Serve the React SPA entry for the root path
