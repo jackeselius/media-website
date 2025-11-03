@@ -14,13 +14,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.views.generic.base import TemplateView
 from django.conf import settings
 from django.conf.urls.static import static
-
-
-
+from rest_framework.authtoken.views import obtain_auth_token
 
 
 urlpatterns = [
@@ -29,13 +27,17 @@ urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     path('media/', include('media.urls')),
     path("aboutme/", include("aboutme.urls")),
-    #path('', TemplateView.as_view(template_name='home.html'), name='home'),
-    path('', include("homepage.urls"), name='home'),
+    # Serve the React SPA entry for the root path
+    path('', TemplateView.as_view(template_name='index.html'), name='home'),
+
+    # Catch-all for client-side routes (exclude API/admin/static/media/accounts/router prefixes)
+    re_path(r'^(?!admin/|accounts/|media/|static/|router/).*$', TemplateView.as_view(template_name='index.html'), name='spa'),
 
     path('router/', include('quickstart.urls')),
-
     
-
+    # API endpoints
+    path('api/auth/login/', obtain_auth_token, name='api_token_auth'),
+    path('api/auth/', include('accounts.api.urls')),
 ]
 
 if settings.DEBUG:
