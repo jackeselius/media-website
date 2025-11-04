@@ -24,6 +24,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.api.urls')),  # Auth API (login/logout/user)
     path('api/media/', include('media.api.urls')),
+    path('api/trading/', include('trading.api.urls')),  # Trading API
     # Removed legacy server-rendered routes for media/aboutme
     # Serve the React SPA entry for the root path
     path('', TemplateView.as_view(template_name='index.html'), name='home'),

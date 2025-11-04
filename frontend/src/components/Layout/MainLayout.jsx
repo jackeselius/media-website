@@ -19,6 +19,7 @@ export function MainLayout() {
     ...(isAuthenticated ? [
       { label: 'Files', path: '/files' },
       { label: 'Upload', path: '/upload' },
+      { label: 'Trading', path: '/trading' },
     ] : []),
     { label: 'About', path: '/about' },
   ];

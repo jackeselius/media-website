@@ -10,6 +10,7 @@ import '@mantine/core/styles.css';
 import { HomePage } from './pages/Home';
 import { FileListPage } from './pages/FileList';
 import { UploadPage } from './pages/Upload';
+import { TradingDashboardPage } from './pages/TradingDashboard';
 import { AboutPage } from './pages/About';
 import { JackEseliusPage } from './pages/JackEselius';
 import { GageCondonPage } from './pages/GageCondon';
@@ -42,6 +43,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <UploadPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'trading',
+        element: (
+          <ProtectedRoute>
+            <TradingDashboardPage />
           </ProtectedRoute>
         ),
       },

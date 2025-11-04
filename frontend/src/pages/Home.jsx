@@ -18,6 +18,9 @@ export function HomePage() {
             <Button component={Link} to="/files" variant="light">
               Files
             </Button>
+            <Button component={Link} to="/trading" variant="light">
+              Trading
+            </Button>
           </Group>
         </>
       ) : (
