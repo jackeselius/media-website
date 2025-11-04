@@ -76,47 +76,58 @@ class Command(BaseCommand):
     def _fetch_from_api(self, limit):
         """
         Fetch politician trades using official government sources.
-        1. House of Representatives disclosures (primary)
-        2. Senate disclosures (secondary)
+        1. FEC/House XML feeds (primary)
+        2. Alternative open data sources
         3. GitHub backup sources
         4. Fallback to placeholder for demo
         """
         
         all_trades = []
         
-        # Strategy 1: Scrape official House disclosures
+        # Strategy 1: Try senatestockwatcher.com JSON feed (free, no key needed)
         try:
-            self.stdout.write('Fetching from House of Representatives disclosures...')
+            self.stdout.write('Fetching from Senate Stock Watcher...')
+            ssw_trades = self._fetch_senate_stock_watcher(limit)
+            
+            if ssw_trades:
+                ssw_trades = [t for t in ssw_trades if self._validate_trade(t)]
+                all_trades.extend(ssw_trades)
+                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(ssw_trades)} trades from Senate Stock Watcher'))
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'Senate Stock Watcher failed: {str(e)}'))
+        
+        # Strategy 2: Try housestockwatcher.com JSON feed
+        try:
+            self.stdout.write('Fetching from House Stock Watcher...')
+            hsw_trades = self._fetch_house_stock_watcher_api(limit)
+            
+            if hsw_trades:
+                hsw_trades = [t for t in hsw_trades if self._validate_trade(t)]
+                all_trades.extend(hsw_trades)
+                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(hsw_trades)} trades from House Stock Watcher'))
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'House Stock Watcher failed: {str(e)}'))
+        
+        # If we got real data, return it
+        if all_trades:
+            self.stdout.write(self.style.SUCCESS(f'✓ Total: {len(all_trades)} trades from open sources'))
+            return all_trades[:limit]
+        
+        # Strategy 3: Official government scrapers (more complex, use as backup)
+        try:
+            self.stdout.write('Trying official House disclosures (may take longer)...')
             house_scraper = HouseScraper()
             house_trades = house_scraper.fetch_recent_transactions(max_records=limit // 2)
             
             if house_trades:
-                # Clean and validate
                 house_trades = [t for t in house_trades if self._validate_trade(t)]
                 all_trades.extend(house_trades)
                 self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(house_trades)} trades from House'))
+                return all_trades[:limit]
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f'House scraper failed: {str(e)}'))
+            self.stdout.write(self.style.WARNING(f'House scraper error: {str(e)}'))
         
-        # Strategy 2: Scrape official Senate disclosures
-        try:
-            self.stdout.write('Fetching from Senate disclosures...')
-            senate_scraper = SenateScraper()
-            senate_trades = senate_scraper.fetch_recent_transactions(max_records=limit // 2)
-            
-            if senate_trades:
-                senate_trades = [t for t in senate_trades if self._validate_trade(t)]
-                all_trades.extend(senate_trades)
-                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(senate_trades)} trades from Senate'))
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(f'Senate scraper failed: {str(e)}'))
-        
-        # If we got real data, return it
-        if all_trades:
-            self.stdout.write(self.style.SUCCESS(f'✓ Total: {len(all_trades)} trades from official sources'))
-            return all_trades[:limit]
-        
-        # Strategy 3: Try GitHub backup sources
+        # Strategy 4: Try GitHub backup sources
         try:
             self.stdout.write('Trying GitHub backup sources...')
             github_trades = self._fetch_github_data(limit)
@@ -130,6 +141,126 @@ class Command(BaseCommand):
         # Fallback: Use placeholder data
         self.stdout.write(self.style.WARNING('All sources failed, using placeholder data for demo'))
         return self._generate_placeholder_data(limit)
+    
+    def _fetch_senate_stock_watcher(self, limit):
+        """Fetch from senatestockwatcher.com JSON API."""
+        try:
+            # This site provides a public JSON endpoint
+            url = "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json"
+            
+            response = requests.get(url, timeout=30)
+            if response.status_code != 200:
+                return []
+            
+            data = response.json()
+            return self._parse_stock_watcher_format(data, limit, chamber='Senate')
+        except:
+            return []
+    
+    def _fetch_house_stock_watcher_api(self, limit):
+        """Fetch from housestockwatcher.com-style JSON API."""
+        try:
+            # Try alternative House data sources
+            urls = [
+                "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json",
+                "https://house-stock-watcher-data.s3.us-west-2.amazonaws.com/data/all_transactions.json",
+            ]
+            
+            for url in urls:
+                try:
+                    response = requests.get(url, timeout=30, headers={
+                        'User-Agent': 'Mozilla/5.0'
+                    })
+                    if response.status_code == 200:
+                        data = response.json()
+                        return self._parse_stock_watcher_format(data, limit, chamber='House')
+                except:
+                    continue
+            
+            return []
+        except:
+            return []
+    
+    def _parse_stock_watcher_format(self, data, limit, chamber='House'):
+        """Parse the stock watcher JSON format (works for both House and Senate)."""
+        trades = []
+        
+        for item in data[:limit]:
+            try:
+                # Parse transaction type
+                tx_type = item.get('transaction_type', item.get('type', '')).lower()
+                if 'purchase' in tx_type or 'buy' in tx_type:
+                    action = 'BUY'
+                elif 'sale' in tx_type or 'sell' in tx_type or 'sold' in tx_type:
+                    action = 'SELL'
+                else:
+                    continue
+                
+                # Get ticker
+                ticker = item.get('ticker', '').strip().upper()
+                if not ticker or ticker == '--' or ticker == 'N/A':
+                    continue
+                
+                # Parse trade date
+                trade_date = None
+                date_str = item.get('transaction_date', item.get('disclosure_date', ''))
+                if date_str:
+                    try:
+                        trade_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    except:
+                        try:
+                            trade_date = datetime.strptime(date_str, '%m/%d/%Y').date()
+                        except:
+                            continue
+                
+                if not trade_date:
+                    continue
+                
+                # Parse disclosure date
+                disclosure_date = None
+                disc_str = item.get('disclosure_date', item.get('filed_date', ''))
+                if disc_str and disc_str != date_str:
+                    try:
+                        disclosure_date = datetime.strptime(disc_str, '%Y-%m-%d').date()
+                    except:
+                        try:
+                            disclosure_date = datetime.strptime(disc_str, '%m/%d/%Y').date()
+                        except:
+                            pass
+                
+                # Parse amount
+                amount = None
+                amt_str = item.get('amount', item.get('size', ''))
+                if amt_str:
+                    try:
+                        amt_clean = str(amt_str).replace('$', '').replace(',', '').strip()
+                        if '-' in amt_clean:
+                            parts = amt_clean.split('-')
+                            low = float(re.sub(r'[^\d.]', '', parts[0]))
+                            high = float(re.sub(r'[^\d.]', '', parts[1]))
+                            amount = (low + high) / 2
+                        else:
+                            amount = float(re.sub(r'[^\d.]', '', amt_clean))
+                    except:
+                        pass
+                
+                # Get politician name
+                politician_name = item.get('representative', item.get('senator', item.get('name', 'Unknown')))
+                
+                trades.append({
+                    'politician_name': politician_name,
+                    'ticker': ticker,
+                    'action': action,
+                    'trade_date': trade_date,
+                    'amount': amount,
+                    'disclosure_date': disclosure_date,
+                    'asset_description': item.get('asset_description', item.get('asset', ''))[:200],
+                })
+            
+            except Exception as e:
+                continue
+        
+        return trades
     
     def _validate_trade(self, trade: dict) -> bool:
         """Validate trade data before saving."""
