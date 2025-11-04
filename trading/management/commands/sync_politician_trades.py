@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from trading.models import Trade
+from trading.scrapers import HouseScraper, SenateScraper, clean_politician_name, validate_ticker
 from datetime import datetime
 import requests
 import os
@@ -74,52 +75,105 @@ class Command(BaseCommand):
     
     def _fetch_from_api(self, limit):
         """
-        Fetch politician trades using multiple strategies.
-        1. Try GitHub-hosted open data
-        2. Try scraping Capitol Trades website
-        3. Fallback to placeholder
+        Fetch politician trades using official government sources.
+        1. House of Representatives disclosures (primary)
+        2. Senate disclosures (secondary)
+        3. GitHub backup sources
+        4. Fallback to placeholder for demo
         """
         
-        # Strategy 1: Try raw GitHub data repositories
+        all_trades = []
+        
+        # Strategy 1: Scrape official House disclosures
         try:
-            self.stdout.write('Trying GitHub open data sources...')
+            self.stdout.write('Fetching from House of Representatives disclosures...')
+            house_scraper = HouseScraper()
+            house_trades = house_scraper.fetch_recent_transactions(max_records=limit // 2)
             
-            # Try the house-stock-watcher GitHub raw data
-            urls = [
-                'https://raw.githubusercontent.com/house-stock-watcher/house-stock-watcher/main/data/all_transactions.json',
-                'https://raw.githubusercontent.com/house-stock-watcher/house-stock-watcher/master/data/all_transactions.json',
-            ]
+            if house_trades:
+                # Clean and validate
+                house_trades = [t for t in house_trades if self._validate_trade(t)]
+                all_trades.extend(house_trades)
+                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(house_trades)} trades from House'))
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'House scraper failed: {str(e)}'))
+        
+        # Strategy 2: Scrape official Senate disclosures
+        try:
+            self.stdout.write('Fetching from Senate disclosures...')
+            senate_scraper = SenateScraper()
+            senate_trades = senate_scraper.fetch_recent_transactions(max_records=limit // 2)
             
-            for url in urls:
-                try:
-                    response = requests.get(url, timeout=30)
-                    if response.status_code == 200:
-                        data = response.json()
-                        trades = self._parse_house_stock_watcher(data, limit)
-                        if trades:
-                            self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(trades)} trades from GitHub'))
-                            return trades
-                except:
-                    continue
-                    
+            if senate_trades:
+                senate_trades = [t for t in senate_trades if self._validate_trade(t)]
+                all_trades.extend(senate_trades)
+                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(senate_trades)} trades from Senate'))
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'Senate scraper failed: {str(e)}'))
+        
+        # If we got real data, return it
+        if all_trades:
+            self.stdout.write(self.style.SUCCESS(f'✓ Total: {len(all_trades)} trades from official sources'))
+            return all_trades[:limit]
+        
+        # Strategy 3: Try GitHub backup sources
+        try:
+            self.stdout.write('Trying GitHub backup sources...')
+            github_trades = self._fetch_github_data(limit)
+            if github_trades:
+                all_trades.extend(github_trades)
+                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(github_trades)} trades from GitHub'))
+                return all_trades[:limit]
         except Exception as e:
             self.stdout.write(self.style.WARNING(f'GitHub sources failed: {str(e)}'))
         
-        # Strategy 2: Scrape Capitol Trades website directly
-        try:
-            self.stdout.write('Trying Capitol Trades web scraping...')
-            trades = self._scrape_capitol_trades(limit)
-            if trades:
-                self.stdout.write(self.style.SUCCESS(f'✓ Scraped {len(trades)} trades from Capitol Trades'))
-                return trades
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(f'Capitol Trades scraping failed: {str(e)}'))
-        
-        self.stdout.write(self.style.WARNING('All sources failed, using placeholder data'))
+        # Fallback: Use placeholder data
+        self.stdout.write(self.style.WARNING('All sources failed, using placeholder data for demo'))
         return self._generate_placeholder_data(limit)
     
+    def _validate_trade(self, trade: dict) -> bool:
+        """Validate trade data before saving."""
+        # Must have essential fields
+        if not trade.get('politician_name') or not trade.get('ticker') or not trade.get('trade_date'):
+            return False
+        
+        # Clean politician name
+        trade['politician_name'] = clean_politician_name(trade['politician_name'])
+        
+        # Validate ticker
+        ticker = trade.get('ticker', '').strip().upper()
+        if not validate_ticker(ticker):
+            return False
+        trade['ticker'] = ticker
+        
+        # Validate action
+        if trade.get('action') not in ['BUY', 'SELL']:
+            return False
+        
+        return True
+    
+    def _fetch_github_data(self, limit):
+        """Try GitHub-hosted open data repositories."""
+        urls = [
+            'https://raw.githubusercontent.com/house-stock-watcher/house-stock-watcher/main/data/all_transactions.json',
+            'https://raw.githubusercontent.com/house-stock-watcher/house-stock-watcher/master/data/all_transactions.json',
+        ]
+        
+        for url in urls:
+            try:
+                response = requests.get(url, timeout=30)
+                if response.status_code == 200:
+                    data = response.json()
+                    trades = self._parse_house_stock_watcher(data, limit)
+                    if trades:
+                        return trades
+            except:
+                continue
+        
+        return []
+    
     def _parse_house_stock_watcher(self, data, limit):
-        """Parse House Stock Watcher JSON format"""
+        """Parse House Stock Watcher JSON format."""
         trades = []
         
         for item in data[:limit]:
@@ -179,56 +233,6 @@ class Command(BaseCommand):
                 'disclosure_date': disclosure_date,
                 'asset_description': item.get('asset_description', ''),
             })
-        
-        return trades
-    
-    def _scrape_capitol_trades(self, limit):
-        """Scrape Capitol Trades website as fallback"""
-        trades = []
-        
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-            
-            response = requests.get(
-                'https://www.capitoltrades.com/trades',
-                headers=headers,
-                timeout=30
-            )
-            
-            if response.status_code != 200:
-                return []
-            
-            soup = BeautifulSoup(response.text, 'lxml')
-            
-            # Look for trade rows in the table
-            # Note: This is fragile and will break if they change their HTML structure
-            trade_rows = soup.select('tr.trade-row, tbody tr')[:limit]
-            
-            for row in trade_rows:
-                try:
-                    # Extract data from table cells
-                    cells = row.find_all('td')
-                    if len(cells) < 5:
-                        continue
-                    
-                    # This is an example - actual selectors need to match their current HTML
-                    politician_name = row.find(class_='politician-name')
-                    ticker = row.find(class_='ticker')
-                    tx_type = row.find(class_='transaction-type')
-                    
-                    if not all([politician_name, ticker, tx_type]):
-                        continue
-                    
-                    # Parse and add to trades
-                    # (Implementation depends on actual HTML structure)
-                    
-                except Exception:
-                    continue
-            
-        except Exception:
-            pass
         
         return trades
     
