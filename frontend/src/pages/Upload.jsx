@@ -11,6 +11,7 @@ export function UploadPage() {
   const form = useForm({
     initialValues: {
       file: null,
+      icon: null,
       description: '',
     },
     validate: {
@@ -23,6 +24,9 @@ export function UploadPage() {
     try {
       const formData = new FormData();
       formData.append('file', values.file);
+      if (values.icon) {
+        formData.append('icon', values.icon);
+      }
       formData.append('description', values.description);
 
       // Use API endpoint that accepts multipart form data
@@ -57,6 +61,13 @@ export function UploadPage() {
             label="File"
             placeholder="Choose file"
             {...form.getInputProps('file')}
+          />
+
+          <FileInput
+            label="Icon / Thumbnail (optional)"
+            placeholder="Choose an icon or thumbnail image"
+            accept="image/*"
+            {...form.getInputProps('icon')}
           />
 
           <TextInput
