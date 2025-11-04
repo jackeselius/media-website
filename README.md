@@ -167,6 +167,8 @@ If you use Apache instead of nginx, you can deploy either with mod_wsgi (embeddi
   WSGIDaemonProcess mediawebsite python-home=/srv/media-website/venv python-path=/srv/media-website
   WSGIProcessGroup mediawebsite
   WSGIScriptAlias / /srv/media-website/MediaWebsite/wsgi.py
+  # REQUIRED for DRF TokenAuthentication: pass Authorization header through to Django
+  WSGIPassAuthorization On
   <Directory "/srv/media-website/MediaWebsite">
     <Files wsgi.py>
       Require all granted
@@ -186,6 +188,7 @@ Notes:
 - Install `libapache2-mod-wsgi-py3` (Debian/Ubuntu) and enable it: `a2enmod wsgi`.
 - Ensure the `python-home` points to your virtualenv and `python-path` to the project root.
 - Run `collectstatic` so `/static/` is populated.
+- If API requests from the SPA always 401 on production (e.g., Files page forces you back to login), double-check `WSGIPassAuthorization On` is present so the `Authorization: Token ...` header reaches Django.
 
 ### Option 2: Reverse proxy to an app server (gunicorn/uvicorn)
 
@@ -218,6 +221,10 @@ Notes:
   ProxyPass        / http://127.0.0.1:8000/
   ProxyPassReverse / http://127.0.0.1:8000/
   RequestHeader set X-Forwarded-Proto https env=HTTPS
+
+  # In some Apache configurations, auth modules may strip Authorization. If you see unexpected 401s,
+  # uncomment the line below to explicitly forward it.
+  # RequestHeader set Authorization expr=%{HTTP:Authorization}
 
   ErrorLog ${APACHE_LOG_DIR}/mediawebsite-error.log
   CustomLog ${APACHE_LOG_DIR}/mediawebsite-access.log combined
@@ -299,6 +306,13 @@ Server:
 
 - 401 Unauthorized
   - Token missing/expired. Log in at `/login`. The axios interceptor redirects to `/login` on 401.
+  - If this happens only on the server (works on your desktop), check Apache:
+    - mod_wsgi: ensure `WSGIPassAuthorization On` is set so the `Authorization` header reaches Django.
+    - reverse proxy: consider `RequestHeader set Authorization expr=%{HTTP:Authorization}` if other auth modules interfere.
+
+- On phone during local development, API calls hit `localhost:8000` and fail
+  - Mobile devices can’t reach your computer’s `localhost`. Set `VITE_API_BASE_URL` to your computer’s LAN IP, e.g. `http://192.168.1.50:8000`.
+  - Or run the SPA through the same origin as Django (use a Vite proxy or build the SPA and let Django serve it).
 
 - Upload 403/CSRF issues
   - Confirm `CSRF_TRUSTED_ORIGINS` includes your domain and that HTTPS is used in production. Ensure token auth is present.
