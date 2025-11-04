@@ -8,7 +8,7 @@ export function HomePage() {
   return (
     <Stack spacing="md" align="center">
       <Center>
-        <Image src="/penguin.svg" alt="EG Studios Penguin" width={200} height={200} />
+        <Image src="/static/penguin.svg" alt="EG Studios Penguin" width={200} height={200} />
       </Center>
       
       {isAuthenticated ? (

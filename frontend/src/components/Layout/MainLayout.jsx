@@ -38,7 +38,7 @@ export function MainLayout() {
         <Group h="100%" px="md" justify="space-between">
           <Group>
             <Burger opened={opened} onClick={() => setOpened(!opened)} size="sm" />
-            <Image src="/penguin.svg" alt="EG Studios" width={32} height={32} />
+            <Image src="/static/penguin.svg" alt="EG Studios" width={32} height={32} />
             <h3 style={{ margin: 0 }}>EG Studios</h3>
           </Group>
           {/* Desktop auth buttons; nav is now always behind burger */}
