@@ -82,12 +82,8 @@ export function FileListPage() {
           {files.map((file) => (
             <Table.Tr key={file.id}>
               <Table.Td>
-                {file.icon ? (
+                {file.icon && (
                   <Avatar src={file.icon} alt={file.filename} size="md" radius="xl" />
-                ) : (
-                  <Avatar size="md" radius="xl" color="gray">
-                    <Text size="xs">No Icon</Text>
-                  </Avatar>
                 )}
               </Table.Td>
               <Table.Td>{file.filename}</Table.Td>
