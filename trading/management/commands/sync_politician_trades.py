@@ -3,6 +3,9 @@ from trading.models import Trade
 from datetime import datetime
 import requests
 import os
+from bs4 import BeautifulSoup
+import json
+import re
 
 
 class Command(BaseCommand):
@@ -71,177 +74,165 @@ class Command(BaseCommand):
     
     def _fetch_from_api(self, limit):
         """
-        Fetch politician trades from free public sources.
-        Primary: House Stock Watcher API (free, reliable)
-        Fallback: Placeholder data
+        Fetch politician trades using multiple strategies.
+        1. Try GitHub-hosted open data
+        2. Try scraping Capitol Trades website
+        3. Fallback to placeholder
         """
         
-        # Try House Stock Watcher API first (free GitHub-hosted API)
+        # Strategy 1: Try raw GitHub data repositories
         try:
-            self.stdout.write('Fetching from House Stock Watcher API...')
+            self.stdout.write('Trying GitHub open data sources...')
             
-            response = requests.get(
-                'https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json',
-                timeout=30
-            )
-            response.raise_for_status()
-            data = response.json()
+            # Try the house-stock-watcher GitHub raw data
+            urls = [
+                'https://raw.githubusercontent.com/house-stock-watcher/house-stock-watcher/main/data/all_transactions.json',
+                'https://raw.githubusercontent.com/house-stock-watcher/house-stock-watcher/master/data/all_transactions.json',
+            ]
             
-            trades = []
-            
-            for item in data[:limit]:
-                # Parse transaction type
-                tx_type = item.get('type', '').lower()
-                if 'purchase' in tx_type:
-                    action = 'BUY'
-                elif 'sale' in tx_type:
-                    action = 'SELL'
-                else:
+            for url in urls:
+                try:
+                    response = requests.get(url, timeout=30)
+                    if response.status_code == 200:
+                        data = response.json()
+                        trades = self._parse_house_stock_watcher(data, limit)
+                        if trades:
+                            self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(trades)} trades from GitHub'))
+                            return trades
+                except:
                     continue
-                
-                # Get ticker
-                ticker = item.get('ticker', '').strip().upper()
-                if not ticker or ticker == '--':
-                    continue
-                
-                # Parse dates
-                trade_date = None
-                if item.get('transaction_date'):
-                    try:
-                        trade_date = datetime.strptime(item['transaction_date'], '%Y-%m-%d').date()
-                    except:
-                        try:
-                            trade_date = datetime.strptime(item['transaction_date'], '%m/%d/%Y').date()
-                        except:
-                            continue
-                
-                disclosure_date = None
-                if item.get('disclosure_date'):
-                    try:
-                        disclosure_date = datetime.strptime(item['disclosure_date'], '%Y-%m-%d').date()
-                    except:
-                        try:
-                            disclosure_date = datetime.strptime(item['disclosure_date'], '%m/%d/%Y').date()
-                        except:
-                            pass
-                
-                # Parse amount range
-                amount = None
-                amt_str = item.get('amount', '')
-                if amt_str:
-                    try:
-                        # Handle ranges like "$15,001 - $50,000"
-                        amt_clean = amt_str.replace('$', '').replace(',', '').strip()
-                        if '-' in amt_clean:
-                            parts = amt_clean.split('-')
-                            low = float(parts[0].strip())
-                            high = float(parts[1].strip())
-                            amount = (low + high) / 2
-                        else:
-                            amount = float(amt_clean)
-                    except:
-                        pass
-                
-                trades.append({
-                    'politician_name': item.get('representative', 'Unknown'),
-                    'ticker': ticker,
-                    'action': action,
-                    'trade_date': trade_date,
-                    'amount': amount,
-                    'disclosure_date': disclosure_date,
-                    'asset_description': item.get('asset_description', ''),
-                })
-            
-            self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(trades)} trades from House Stock Watcher'))
-            return trades
-            
-        except requests.exceptions.RequestException as e:
-            self.stdout.write(self.style.WARNING(f'House Stock Watcher failed: {str(e)}'))
+                    
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f'Error parsing House Stock Watcher data: {str(e)}'))
+            self.stdout.write(self.style.WARNING(f'GitHub sources failed: {str(e)}'))
         
-        # Try Capitol Trades as fallback
+        # Strategy 2: Scrape Capitol Trades website directly
         try:
-            self.stdout.write('Trying Capitol Trades fallback...')
+            self.stdout.write('Trying Capitol Trades web scraping...')
+            trades = self._scrape_capitol_trades(limit)
+            if trades:
+                self.stdout.write(self.style.SUCCESS(f'✓ Scraped {len(trades)} trades from Capitol Trades'))
+                return trades
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'Capitol Trades scraping failed: {str(e)}'))
+        
+        self.stdout.write(self.style.WARNING('All sources failed, using placeholder data'))
+        return self._generate_placeholder_data(limit)
+    
+    def _parse_house_stock_watcher(self, data, limit):
+        """Parse House Stock Watcher JSON format"""
+        trades = []
+        
+        for item in data[:limit]:
+            tx_type = item.get('type', '').lower()
+            if 'purchase' in tx_type:
+                action = 'BUY'
+            elif 'sale' in tx_type:
+                action = 'SELL'
+            else:
+                continue
             
-            response = requests.get(
-                'https://bff.capitoltrades.com/trades',
-                params={'pageSize': limit, 'page': 1},
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
-                timeout=30
-            )
-            response.raise_for_status()
-            data = response.json()
+            ticker = item.get('ticker', '').strip().upper()
+            if not ticker or ticker == '--':
+                continue
             
-            trades = []
-            trade_list = data.get('data', []) if isinstance(data, dict) else data
-            
-            for item in trade_list[:limit]:
-                politician = item.get('politician', {})
-                politician_name = f"{politician.get('firstName', '')} {politician.get('lastName', '')}".strip() or 'Unknown'
-                
-                asset = item.get('asset', {})
-                ticker = (asset.get('ticker', '') or '').strip().upper()
-                
-                tx_type = (item.get('txType', '') or '').lower()
-                if 'purchase' in tx_type:
-                    action = 'BUY'
-                elif 'sale' in tx_type:
-                    action = 'SELL'
-                else:
-                    continue
-                
-                trade_date = None
-                tx_date = item.get('txDate')
-                if tx_date:
+            trade_date = None
+            if item.get('transaction_date'):
+                try:
+                    trade_date = datetime.strptime(item['transaction_date'], '%Y-%m-%d').date()
+                except:
                     try:
-                        trade_date = datetime.strptime(tx_date[:10], '%Y-%m-%d').date()
+                        trade_date = datetime.strptime(item['transaction_date'], '%m/%d/%Y').date()
                     except:
                         continue
-                
-                if not ticker or not trade_date:
-                    continue
-                
-                disclosure_date = None
-                pub_date = item.get('pubDate')
-                if pub_date:
+            
+            disclosure_date = None
+            if item.get('disclosure_date'):
+                try:
+                    disclosure_date = datetime.strptime(item['disclosure_date'], '%Y-%m-%d').date()
+                except:
                     try:
-                        disclosure_date = datetime.strptime(pub_date[:10], '%Y-%m-%d').date()
+                        disclosure_date = datetime.strptime(item['disclosure_date'], '%m/%d/%Y').date()
                     except:
                         pass
-                
-                amount = None
-                amt = item.get('size')
-                if amt:
-                    try:
-                        amt_str = str(amt).replace('$', '').replace(',', '')
-                        if '-' in amt_str:
-                            parts = amt_str.split('-')
-                            low = float(parts[0].strip())
-                            high = float(parts[1].strip())
-                            amount = (low + high) / 2
-                        else:
-                            amount = float(amt_str)
-                    except:
-                        pass
-                
-                trades.append({
-                    'politician_name': politician_name,
-                    'ticker': ticker,
-                    'action': action,
-                    'trade_date': trade_date,
-                    'amount': amount,
-                    'disclosure_date': disclosure_date,
-                    'asset_description': asset.get('assetDescription', ''),
-                })
             
-            self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(trades)} trades from Capitol Trades'))
-            return trades
+            amount = None
+            amt_str = item.get('amount', '')
+            if amt_str:
+                try:
+                    amt_clean = amt_str.replace('$', '').replace(',', '').strip()
+                    if '-' in amt_clean:
+                        parts = amt_clean.split('-')
+                        low = float(parts[0].strip())
+                        high = float(parts[1].strip())
+                        amount = (low + high) / 2
+                    else:
+                        amount = float(amt_clean)
+                except:
+                    pass
             
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(f'Capitol Trades also failed: {str(e)}'))
+            trades.append({
+                'politician_name': item.get('representative', 'Unknown'),
+                'ticker': ticker,
+                'action': action,
+                'trade_date': trade_date,
+                'amount': amount,
+                'disclosure_date': disclosure_date,
+                'asset_description': item.get('asset_description', ''),
+            })
         
-        self.stdout.write(self.style.WARNING('All APIs failed, using placeholder data'))
+        return trades
+    
+    def _scrape_capitol_trades(self, limit):
+        """Scrape Capitol Trades website as fallback"""
+        trades = []
+        
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+            
+            response = requests.get(
+                'https://www.capitoltrades.com/trades',
+                headers=headers,
+                timeout=30
+            )
+            
+            if response.status_code != 200:
+                return []
+            
+            soup = BeautifulSoup(response.text, 'lxml')
+            
+            # Look for trade rows in the table
+            # Note: This is fragile and will break if they change their HTML structure
+            trade_rows = soup.select('tr.trade-row, tbody tr')[:limit]
+            
+            for row in trade_rows:
+                try:
+                    # Extract data from table cells
+                    cells = row.find_all('td')
+                    if len(cells) < 5:
+                        continue
+                    
+                    # This is an example - actual selectors need to match their current HTML
+                    politician_name = row.find(class_='politician-name')
+                    ticker = row.find(class_='ticker')
+                    tx_type = row.find(class_='transaction-type')
+                    
+                    if not all([politician_name, ticker, tx_type]):
+                        continue
+                    
+                    # Parse and add to trades
+                    # (Implementation depends on actual HTML structure)
+                    
+                except Exception:
+                    continue
+            
+        except Exception:
+            pass
+        
+        return trades
+    
+    def _generate_placeholder_data(self, limit):
         
         # PLACEHOLDER: Return sample data for testing
         # Remove this once you integrate a real API
