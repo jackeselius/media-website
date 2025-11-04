@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Image, Group, Text, Stack } from '@mantine/core';
+import { Table, Button, Image, Group, Text, Stack, Avatar } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
 
@@ -83,9 +83,11 @@ export function FileListPage() {
             <Table.Tr key={file.id}>
               <Table.Td>
                 {file.icon ? (
-                  <Image src={file.icon} alt={file.filename} width={100} />
+                  <Avatar src={file.icon} alt={file.filename} size="md" radius="xl" />
                 ) : (
-                  <Text c="dimmed">No Icon</Text>
+                  <Avatar size="md" radius="xl" color="gray">
+                    <Text size="xs">No Icon</Text>
+                  </Avatar>
                 )}
               </Table.Td>
               <Table.Td>{file.filename}</Table.Td>

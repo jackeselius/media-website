@@ -1,4 +1,4 @@
-import { AppShell, Burger, Group, NavLink, Button, Text } from '@mantine/core';
+import { AppShell, Burger, Group, NavLink, Button, Text, Image } from '@mantine/core';
 import { useState } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -38,6 +38,7 @@ export function MainLayout() {
         <Group h="100%" px="md" justify="space-between">
           <Group>
             <Burger opened={opened} onClick={() => setOpened(!opened)} size="sm" />
+            <Image src="/penguin.svg" alt="EG Studios" width={32} height={32} />
             <h3 style={{ margin: 0 }}>EG Studios</h3>
           </Group>
           {/* Desktop auth buttons; nav is now always behind burger */}

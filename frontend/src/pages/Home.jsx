@@ -1,4 +1,4 @@
-import { Button, Text, Group, Stack } from '@mantine/core';
+import { Button, Text, Group, Stack, Image, Center } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -6,7 +6,11 @@ export function HomePage() {
   const { isAuthenticated, username } = useAuth();
 
   return (
-    <Stack spacing="md">
+    <Stack spacing="md" align="center">
+      <Center>
+        <Image src="/penguin.svg" alt="EG Studios Penguin" width={200} height={200} />
+      </Center>
+      
       {isAuthenticated ? (
         <>
           <Text size="lg">Hi {username}!</Text>
