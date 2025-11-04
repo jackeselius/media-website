@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { MantineProvider } from '@mantine/core';
+import { MantineProvider, createTheme } from '@mantine/core';
 import App from './App';
 import './index.css';
 import '@mantine/core/styles.css';
@@ -77,9 +77,50 @@ const router = createBrowserRouter([
   },
 ]);
 
+const theme = createTheme({
+  colorScheme: 'dark',
+  primaryColor: 'green',
+  colors: {
+    // Neon green custom palette
+    green: [
+      '#e6ffe6',
+      '#ccffcc',
+      '#99ff99',
+      '#66ff66',
+      '#33ff33',
+      '#00ff00', // neon green base
+      '#00cc00',
+      '#009900',
+      '#006600',
+      '#003300',
+    ],
+  },
+  defaultRadius: 'md',
+  components: {
+    Button: {
+      defaultProps: {
+        color: 'green',
+      },
+    },
+    NavLink: {
+      styles: {
+        root: {
+          '&[data-active]': {
+            backgroundColor: 'rgba(0, 255, 0, 0.1)',
+            borderLeft: '3px solid #00ff00',
+          },
+          '&:hover': {
+            backgroundColor: 'rgba(0, 255, 0, 0.05)',
+          },
+        },
+      },
+    },
+  },
+});
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <MantineProvider>
+    <MantineProvider theme={theme} defaultColorScheme="dark">
       <RouterProvider router={router} />
     </MantineProvider>
   </React.StrictMode>,

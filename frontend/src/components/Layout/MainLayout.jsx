@@ -29,42 +29,31 @@ export function MainLayout() {
       navbar={{
         width: 300,
         breakpoint: 'sm',
-        // Hide navbar on desktop to avoid double menus; use burger on mobile
-        collapsed: { mobile: !opened, desktop: true }
+        // Collapsed by default on all screen sizes; burger opens it
+        collapsed: { mobile: !opened, desktop: !opened }
       }}
       padding="md"
     >
       <AppShell.Header>
-        <Group h="100%" px="md">
-          <Burger opened={opened} onClick={() => setOpened(!opened)} hiddenFrom="sm" size="sm" />
-          <Group justify="space-between" style={{ flex: 1 }}>
-            <h3 style={{ margin: 0 }}>Media Website</h3>
-            <Group>
-              <Group ml="xl" gap={0} visibleFrom="sm">
-                {navigation.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    label={item.label}
-                    active={location.pathname === item.path}
-                    onClick={() => navigate(item.path)}
-                  />
-                ))}
-              </Group>
-              <Group ml="xl" visibleFrom="sm">
-                {isAuthenticated ? (
-                  <>
-                    <Text size="sm">Welcome, {username}</Text>
-                    <Button variant="light" onClick={handleLogout}>
-                      Logout
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="light" onClick={() => navigate('/login')}>
-                    Login
-                  </Button>
-                )}
-              </Group>
-            </Group>
+        <Group h="100%" px="md" justify="space-between">
+          <Group>
+            <Burger opened={opened} onClick={() => setOpened(!opened)} size="sm" />
+            <h3 style={{ margin: 0 }}>EG Studios</h3>
+          </Group>
+          {/* Desktop auth buttons; nav is now always behind burger */}
+          <Group visibleFrom="sm">
+            {isAuthenticated ? (
+              <>
+                <Text size="sm">Welcome, {username}</Text>
+                <Button variant="light" onClick={handleLogout}>
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Button variant="light" onClick={() => navigate('/login')}>
+                Login
+              </Button>
+            )}
           </Group>
         </Group>
       </AppShell.Header>
