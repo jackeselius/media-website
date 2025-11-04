@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from trading.models import Trade
 from trading.scrapers import HouseScraper, SenateScraper, clean_politician_name, validate_ticker
+from trading.selenium_scraper import SeleniumStockScraper
 from datetime import datetime
 import requests
 import os
@@ -75,47 +76,61 @@ class Command(BaseCommand):
     
     def _fetch_from_api(self, limit):
         """
-        Fetch politician trades using official government sources.
-        1. FEC/House XML feeds (primary)
-        2. Alternative open data sources
-        3. GitHub backup sources
-        4. Fallback to placeholder for demo
+        Fetch politician trades using Selenium-based scraping.
+        1. House Stock Watcher (Selenium - primary)
+        2. Senate Stock Watcher (Selenium - secondary)
+        3. Official government scrapers (backup)
+        4. GitHub backup sources
+        5. Fallback to placeholder for demo
         """
         
         all_trades = []
         
-        # Strategy 1: Try senatestockwatcher.com JSON feed (free, no key needed)
+        # Strategy 1: Selenium scraper for House Stock Watcher
         try:
-            self.stdout.write('Fetching from Senate Stock Watcher...')
-            ssw_trades = self._fetch_senate_stock_watcher(limit)
+            self.stdout.write('Fetching from House Stock Watcher (Selenium)...')
+            scraper = SeleniumStockScraper(headless=True)
+            house_trades = scraper.fetch_house_stock_watcher(limit=limit // 2)
             
-            if ssw_trades:
-                ssw_trades = [t for t in ssw_trades if self._validate_trade(t)]
-                all_trades.extend(ssw_trades)
-                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(ssw_trades)} trades from Senate Stock Watcher'))
+            if house_trades:
+                house_trades = [t for t in house_trades if self._validate_trade(t)]
+                all_trades.extend(house_trades)
+                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(house_trades)} trades from House Stock Watcher'))
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f'Senate Stock Watcher failed: {str(e)}'))
+            self.stdout.write(self.style.WARNING(f'House Stock Watcher (Selenium) failed: {str(e)}'))
         
-        # Strategy 2: Try housestockwatcher.com JSON feed
+        # Strategy 2: Selenium scraper for Senate Stock Watcher
         try:
-            self.stdout.write('Fetching from House Stock Watcher...')
-            hsw_trades = self._fetch_house_stock_watcher_api(limit)
+            self.stdout.write('Fetching from Senate Stock Watcher (Selenium)...')
+            scraper = SeleniumStockScraper(headless=True)
+            senate_trades = scraper.fetch_senate_stock_watcher(limit=limit // 2)
             
-            if hsw_trades:
-                hsw_trades = [t for t in hsw_trades if self._validate_trade(t)]
-                all_trades.extend(hsw_trades)
-                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(hsw_trades)} trades from House Stock Watcher'))
+            if senate_trades:
+                senate_trades = [t for t in senate_trades if self._validate_trade(t)]
+                all_trades.extend(senate_trades)
+                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(senate_trades)} trades from Senate Stock Watcher'))
         except Exception as e:
-            self.stdout.write(self.style.WARNING(f'House Stock Watcher failed: {str(e)}'))
+            self.stdout.write(self.style.WARNING(f'Senate Stock Watcher (Selenium) failed: {str(e)}'))
         
-        # If we got real data, return it
+        # If we got real data from Selenium, return it
         if all_trades:
-            self.stdout.write(self.style.SUCCESS(f'✓ Total: {len(all_trades)} trades from open sources'))
+            self.stdout.write(self.style.SUCCESS(f'✓ Total: {len(all_trades)} trades from Selenium scrapers'))
             return all_trades[:limit]
         
-        # Strategy 3: Official government scrapers (more complex, use as backup)
+        # Strategy 3: Try JSON API endpoints (no Selenium)
         try:
-            self.stdout.write('Trying official House disclosures (may take longer)...')
+            self.stdout.write('Trying JSON API endpoints...')
+            json_trades = self._try_json_apis(limit)
+            if json_trades:
+                all_trades.extend(json_trades)
+                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(json_trades)} trades from JSON APIs'))
+                return all_trades[:limit]
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'JSON APIs failed: {str(e)}'))
+        
+        # Strategy 4: Official government scrapers (more complex)
+        try:
+            self.stdout.write('Trying official House disclosures...')
             house_scraper = HouseScraper()
             house_trades = house_scraper.fetch_recent_transactions(max_records=limit // 2)
             
@@ -127,7 +142,7 @@ class Command(BaseCommand):
         except Exception as e:
             self.stdout.write(self.style.WARNING(f'House scraper error: {str(e)}'))
         
-        # Strategy 4: Try GitHub backup sources
+        # Strategy 5: Try GitHub backup sources
         try:
             self.stdout.write('Trying GitHub backup sources...')
             github_trades = self._fetch_github_data(limit)
@@ -142,44 +157,25 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING('All sources failed, using placeholder data for demo'))
         return self._generate_placeholder_data(limit)
     
-    def _fetch_senate_stock_watcher(self, limit):
-        """Fetch from senatestockwatcher.com JSON API."""
-        try:
-            # This site provides a public JSON endpoint
-            url = "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json"
-            
-            response = requests.get(url, timeout=30)
-            if response.status_code != 200:
-                return []
-            
-            data = response.json()
-            return self._parse_stock_watcher_format(data, limit, chamber='Senate')
-        except:
-            return []
-    
-    def _fetch_house_stock_watcher_api(self, limit):
-        """Fetch from housestockwatcher.com-style JSON API."""
-        try:
-            # Try alternative House data sources
-            urls = [
-                "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json",
-                "https://house-stock-watcher-data.s3.us-west-2.amazonaws.com/data/all_transactions.json",
-            ]
-            
-            for url in urls:
-                try:
-                    response = requests.get(url, timeout=30, headers={
-                        'User-Agent': 'Mozilla/5.0'
-                    })
-                    if response.status_code == 200:
-                        data = response.json()
-                        return self._parse_stock_watcher_format(data, limit, chamber='House')
-                except:
-                    continue
-            
-            return []
-        except:
-            return []
+    def _try_json_apis(self, limit):
+        """Try various JSON API endpoints without Selenium."""
+        urls = [
+            "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json",
+            "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json",
+        ]
+        
+        for url in urls:
+            try:
+                response = requests.get(url, timeout=30, headers={
+                    'User-Agent': 'Mozilla/5.0'
+                })
+                if response.status_code == 200:
+                    data = response.json()
+                    return self._parse_stock_watcher_format(data, limit, chamber='Mixed')
+            except:
+                continue
+        
+        return []
     
     def _parse_stock_watcher_format(self, data, limit, chamber='House'):
         """Parse the stock watcher JSON format (works for both House and Senate)."""
