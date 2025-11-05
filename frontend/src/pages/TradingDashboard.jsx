@@ -12,9 +12,7 @@ export function TradingDashboardPage() {
   const [lastSyncAt, setLastSyncAt] = useState(null); // backend-reported last API sync
   const CACHE_KEY = 'tradingDashboardCacheV1';
 
-  useEffect(() => {
-    loadTrades();
-    loadStatus();
+  // Load backend sync status (last successful API pull)
   const loadStatus = async () => {
     try {
       const res = await api.get('/api/trading/status/');
@@ -24,6 +22,10 @@ export function TradingDashboardPage() {
       // Non-fatal if status missing
     }
   };
+
+  useEffect(() => {
+    loadTrades();
+    loadStatus();
     // Optional: set up polling for real-time updates
     // const interval = setInterval(loadTrades, 30000); // refresh every 30s
     // return () => clearInterval(interval);
@@ -52,15 +54,16 @@ export function TradingDashboardPage() {
 
       const response = await api.get('/api/trading/trades/', { params: { page_size: 100 } });
       const data = response.data;
+      let maxDate = null;
       if (Array.isArray(data)) {
         setTrades(data);
         setTotalCount(data.length);
-        const maxDate = data.reduce((acc, t) => (t.trade_date && (!acc || t.trade_date > acc) ? t.trade_date : acc), null);
+        maxDate = data.reduce((acc, t) => (t.trade_date && (!acc || t.trade_date > acc) ? t.trade_date : acc), null);
         setLastTradeDate(maxDate);
       } else if (data && Array.isArray(data.results)) {
         setTrades(data.results);
         setTotalCount(typeof data.count === 'number' ? data.count : data.results.length);
-        const maxDate = data.results.reduce((acc, t) => (t.trade_date && (!acc || t.trade_date > acc) ? t.trade_date : acc), null);
+        maxDate = data.results.reduce((acc, t) => (t.trade_date && (!acc || t.trade_date > acc) ? t.trade_date : acc), null);
         setLastTradeDate(maxDate);
       } else {
         setTrades([]);
@@ -77,7 +80,7 @@ export function TradingDashboardPage() {
           updatedAt: nowIso,
           trades: Array.isArray(data) ? data : (data?.results ?? []),
           totalCount: typeof data?.count === 'number' ? data.count : (Array.isArray(data) ? data.length : undefined),
-          lastTradeDate: lastTradeDate,
+          lastTradeDate: maxDate,
         };
         sessionStorage.setItem(CACHE_KEY, JSON.stringify(payload));
       } catch {}
