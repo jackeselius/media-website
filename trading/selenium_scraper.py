@@ -98,16 +98,34 @@ class SeleniumStockScraper:
             # Retry once with legacy headless flag in case server Chrome doesn't support new headless
             if self.headless:
                 try:
-                    chrome_options.arguments = [arg for arg in chrome_options.arguments if not arg.startswith('--headless')]
-                    chrome_options.add_argument('--headless')
+                    # Rebuild chrome_options with legacy headless instead of modifying arguments
+                    chrome_options_legacy = Options()
+                    chrome_options_legacy.add_argument('--headless')  # Legacy headless
+                    chrome_options_legacy.add_argument('--no-sandbox')
+                    chrome_options_legacy.add_argument('--disable-dev-shm-usage')
+                    chrome_options_legacy.add_argument('--disable-blink-features=AutomationControlled')
+                    chrome_options_legacy.add_experimental_option("excludeSwitches", ["enable-automation"])
+                    chrome_options_legacy.add_experimental_option('useAutomationExtension', False)
+                    chrome_options_legacy.add_argument('--disable-gpu')
+                    chrome_options_legacy.add_argument('--remote-debugging-port=9222')
+                    chrome_options_legacy.add_argument('--window-size=1920,1080')
+                    chrome_options_legacy.add_argument('--disable-software-rasterizer')
+                    chrome_options_legacy.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+                    
+                    if chrome_binary:
+                        chrome_options_legacy.binary_location = chrome_binary
+                    
                     if chromedriver_path:
                         service = Service(executable_path=chromedriver_path)
                     else:
                         service = Service(ChromeDriverManager().install())
-                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                    
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options_legacy)
                     self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
                 except Exception as e2:
                     raise RuntimeError(f"Failed to launch headless Chrome: {e2}") from e
+            else:
+                raise
     
     def _human_delay(self, min_seconds=1, max_seconds=3):
         """Add random delay to mimic human behavior."""
