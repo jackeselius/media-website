@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.conf import settings
 from trading.models import Trade
 from datetime import datetime
 import requests
@@ -33,6 +34,7 @@ class Command(BaseCommand):
             # For demo purposes, using a placeholder that you'll replace with actual API
             
             # Fetch from configured sources (QuiverQuant -> placeholder)
+            self._last_source = None
             trades_data = self._fetch_from_api(limit)
             
             created_count = 0
@@ -63,6 +65,23 @@ class Command(BaseCommand):
                     f'✓ Sync complete: {created_count} new trades, {updated_count} updated'
                 )
             )
+
+            # Write sync status for API/Frontend to read
+            try:
+                status = {
+                    'last_attempt_at': datetime.utcnow().isoformat() + 'Z',
+                    'last_success_at': datetime.utcnow().isoformat() + 'Z' if self._last_source == 'quiver' else None,
+                    'source': self._last_source or 'unknown',
+                    'created': created_count,
+                    'updated': updated_count,
+                    'total': Trade.objects.count(),
+                }
+                sync_dir = os.path.join(getattr(settings, 'MEDIA_ROOT', '.'), 'sync')
+                os.makedirs(sync_dir, exist_ok=True)
+                with open(os.path.join(sync_dir, 'trading_status.json'), 'w', encoding='utf-8') as f:
+                    json.dump(status, f)
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f'Could not write sync status: {e}'))
             
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Error fetching trades: {str(e)}'))
@@ -81,12 +100,14 @@ class Command(BaseCommand):
             if qqq_trades:
                 qqq_trades = [t for t in qqq_trades if self._validate_trade(t)]
                 self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(qqq_trades)} trades from QuiverQuant'))
+                self._last_source = 'quiver'
                 return qqq_trades[:limit]
         except Exception as e:
             self.stdout.write(self.style.WARNING(f'QuiverQuant failed: {str(e)}'))
 
         # Fallback: Use placeholder data
         self.stdout.write(self.style.WARNING('All sources failed, using placeholder data for demo'))
+        self._last_source = 'placeholder'
         return self._generate_placeholder_data(limit)
 
     def _fetch_quiver_quant(self, limit):
