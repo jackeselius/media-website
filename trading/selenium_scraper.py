@@ -14,6 +14,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+import os
+import shutil
 
 
 class SeleniumStockScraper:
@@ -25,12 +27,13 @@ class SeleniumStockScraper:
         self.driver = None
     
     def _init_driver(self):
-        """Initialize Chrome driver with stealth options."""
+        """Initialize Chrome driver with robust server-safe options."""
         if self.driver:
             return
         
         chrome_options = Options()
         
+        # Prefer the new headless, fall back to legacy headless if needed
         if self.headless:
             chrome_options.add_argument('--headless=new')
         
@@ -40,17 +43,71 @@ class SeleniumStockScraper:
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--remote-debugging-port=9222')
+        chrome_options.add_argument('--window-size=1920,1080')
+        chrome_options.add_argument('--disable-software-rasterizer')
         
         # Realistic user agent
         chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
-        # Use webdriver-manager to auto-install chromedriver
-        service = Service(ChromeDriverManager().install())
-        
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        # Remove webdriver flag
-        self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        # Detect Chrome/Chromium binary
+        chrome_binary = os.getenv('CHROME_BINARY')
+        if not chrome_binary:
+            for candidate in [
+                shutil.which('google-chrome'),
+                shutil.which('google-chrome-stable'),
+                shutil.which('chromium-browser'),
+                shutil.which('chromium'),
+                '/usr/bin/google-chrome',
+                '/usr/bin/google-chrome-stable',
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium',
+                '/snap/bin/chromium',
+            ]:
+                if candidate and os.path.exists(candidate):
+                    chrome_binary = candidate
+                    break
+        if chrome_binary:
+            chrome_options.binary_location = chrome_binary
+
+        # Prefer system chromedriver if available, else use webdriver-manager
+        chromedriver_path = os.getenv('CHROMEDRIVER_PATH')
+        if not chromedriver_path:
+            for candidate in [
+                shutil.which('chromedriver'),
+                '/usr/bin/chromedriver',
+                '/snap/bin/chromium.chromedriver',
+            ]:
+                if candidate and os.path.exists(candidate):
+                    chromedriver_path = candidate
+                    break
+
+        try:
+            if chromedriver_path:
+                service = Service(executable_path=chromedriver_path)
+            else:
+                # Use webdriver-manager to auto-install matching chromedriver
+                service = Service(ChromeDriverManager().install())
+
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+
+            # Remove webdriver flag
+            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        except Exception as e:
+            # Retry once with legacy headless flag in case server Chrome doesn't support new headless
+            if self.headless:
+                try:
+                    chrome_options.arguments = [arg for arg in chrome_options.arguments if not arg.startswith('--headless')]
+                    chrome_options.add_argument('--headless')
+                    if chromedriver_path:
+                        service = Service(executable_path=chromedriver_path)
+                    else:
+                        service = Service(ChromeDriverManager().install())
+                    self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                    self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                except Exception as e2:
+                    raise RuntimeError(f"Failed to launch headless Chrome: {e2}") from e
     
     def _human_delay(self, min_seconds=1, max_seconds=3):
         """Add random delay to mimic human behavior."""
