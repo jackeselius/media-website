@@ -133,84 +133,103 @@ class SeleniumStockScraper:
     
     def fetch_house_stock_watcher(self, limit=50):
         """
-        Scrape House Stock Watcher website.
-        Target: https://housestockwatcher.com/summary_by_ticker
+        Scrape House Financial Disclosures (official government site).
+        Target: https://disclosurespreview.house.gov/
         """
         try:
             self._init_driver()
             
-            url = "https://housestockwatcher.com/summary_by_ticker"
+            url = "https://disclosurespreview.house.gov/ld/ldsearch"
             print(f"Loading {url}...")
             
             self.driver.get(url)
-            self._human_delay(2, 4)  # Wait for page load
+            self._human_delay(3, 5)  # Wait for page load
             
-            # Wait for table to load
-            wait = WebDriverWait(self.driver, 10)
-            table = wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
+            # Wait for search results or table to load
+            wait = WebDriverWait(self.driver, 15)
             
-            trades = []
-            
-            # Find all rows in the table
-            rows = self.driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
-            
-            for idx, row in enumerate(rows[:limit]):
-                try:
-                    cells = row.find_elements(By.TAG_NAME, "td")
-                    
-                    if len(cells) < 6:
-                        continue
-                    
-                    # Extract data from cells
-                    # Typical format: Ticker | Representative | Transaction | Date | Amount | Filed
-                    ticker = cells[0].text.strip().upper()
-                    politician_name = cells[1].text.strip()
-                    transaction_type = cells[2].text.strip().lower()
-                    trade_date_str = cells[3].text.strip()
-                    amount_str = cells[4].text.strip()
-                    filed_date_str = cells[5].text.strip() if len(cells) > 5 else None
-                    
-                    # Parse transaction type
-                    if 'purchase' in transaction_type or 'buy' in transaction_type:
-                        action = 'BUY'
-                    elif 'sale' in transaction_type or 'sell' in transaction_type:
-                        action = 'SELL'
-                    else:
-                        continue
-                    
-                    # Parse dates
-                    trade_date = self._parse_date(trade_date_str)
-                    if not trade_date:
-                        continue
-                    
-                    disclosure_date = self._parse_date(filed_date_str) if filed_date_str else None
-                    
-                    # Parse amount
-                    amount = self._parse_amount(amount_str)
-                    
-                    # Validate ticker
-                    if not self._validate_ticker(ticker):
-                        continue
-                    
-                    trades.append({
-                        'politician_name': politician_name,
-                        'ticker': ticker,
-                        'action': action,
-                        'trade_date': trade_date,
-                        'amount': amount,
-                        'disclosure_date': disclosure_date,
-                        'asset_description': f"{ticker} - {transaction_type}"
-                    })
-                    
-                    # Random delay between processing rows
-                    if idx % 10 == 0:
-                        self._human_delay(0.5, 1.5)
+            # Try to find PTR (Periodic Transaction Report) links
+            try:
+                # Look for recent PTR filings
+                ptr_links = wait.until(EC.presence_of_all_elements_located(
+                    (By.XPATH, "//a[contains(@href, 'ptr') or contains(text(), 'PTR')]")
+                ))[:limit]
                 
-                except Exception as e:
-                    print(f"Error parsing row: {e}")
-                    continue
+                trades = []
+                
+                for idx, link in enumerate(ptr_links):
+                    try:
+                        # Click to view the PTR filing
+                        filing_url = link.get_attribute('href')
+                        if filing_url:
+                            self.driver.get(filing_url)
+                            self._human_delay(2, 4)
+                            
+                            # Parse the filing page for transaction details
+                            # Look for transaction tables
+                            try:
+                                rows = self.driver.find_elements(By.CSS_SELECTOR, "table tr")
+                                
+                                for row in rows:
+                                    cells = row.find_elements(By.TAG_NAME, "td")
+                                    if len(cells) < 4:
+                                        continue
+                                    
+                                    # Extract transaction data (adjust indices based on actual table structure)
+                                    asset_text = cells[0].text.strip()
+                                    transaction_type = cells[1].text.strip().lower() if len(cells) > 1 else ''
+                                    trade_date_str = cells[2].text.strip() if len(cells) > 2 else ''
+                                    amount_str = cells[3].text.strip() if len(cells) > 3 else ''
+                                    
+                                    # Extract ticker from asset description
+                                    ticker = self._extract_ticker_from_text(asset_text)
+                                    if not ticker:
+                                        continue
+                                    
+                                    # Parse transaction type
+                                    if 'purchase' in transaction_type or 'buy' in transaction_type:
+                                        action = 'BUY'
+                                    elif 'sale' in transaction_type or 'sell' in transaction_type:
+                                        action = 'SELL'
+                                    else:
+                                        continue
+                                    
+                                    # Parse date
+                                    trade_date = self._parse_date(trade_date_str)
+                                    if not trade_date:
+                                        continue
+                                    
+                                    # Parse amount
+                                    amount = self._parse_amount(amount_str)
+                                    
+                                    trades.append({
+                                        'politician_name': 'House Member',  # Extract from filing header
+                                        'ticker': ticker,
+                                        'action': action,
+                                        'trade_date': trade_date,
+                                        'amount': amount,
+                                        'disclosure_date': None,
+                                        'asset_description': asset_text[:200]
+                                    })
+                            except:
+                                pass
+                            
+                            # Go back to listing
+                            self.driver.back()
+                            self._human_delay(1, 2)
+                        
+                        if idx % 5 == 0 and idx > 0:
+                            self._human_delay(2, 4)
+                    
+                    except Exception as e:
+                        print(f"Error parsing filing: {e}")
+                        continue
+                
+                return trades[:limit]
             
-            return trades
+            except Exception as e:
+                print(f"Could not find PTR filings: {e}")
+                return []
         
         except Exception as e:
             print(f"Error scraping House Stock Watcher: {e}")
@@ -223,79 +242,101 @@ class SeleniumStockScraper:
     
     def fetch_senate_stock_watcher(self, limit=50):
         """
-        Scrape Senate Stock Watcher website.
-        Target: https://senatestockwatcher.com/
+        Scrape Senate Financial Disclosures (official government site).
+        Target: https://efdsearch.senate.gov/search/
         """
         try:
             self._init_driver()
             
-            url = "https://senatestockwatcher.com/"
+            url = "https://efdsearch.senate.gov/search/home/"
             print(f"Loading {url}...")
             
             self.driver.get(url)
-            self._human_delay(2, 4)
+            self._human_delay(3, 5)
             
-            # Wait for table to load
-            wait = WebDriverWait(self.driver, 10)
-            table = wait.until(EC.presence_of_element_located((By.TAG_NAME, "table")))
+            # Wait for page to load
+            wait = WebDriverWait(self.driver, 15)
             
             trades = []
             
-            # Find all rows
-            rows = self.driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
-            
-            for idx, row in enumerate(rows[:limit]):
-                try:
-                    cells = row.find_elements(By.TAG_NAME, "td")
-                    
-                    if len(cells) < 5:
-                        continue
-                    
-                    # Extract data (adjust column indices based on actual site structure)
-                    politician_name = cells[0].text.strip()
-                    ticker = cells[1].text.strip().upper()
-                    transaction_type = cells[2].text.strip().lower()
-                    trade_date_str = cells[3].text.strip()
-                    amount_str = cells[4].text.strip()
-                    
-                    # Parse transaction type
-                    if 'purchase' in transaction_type or 'buy' in transaction_type:
-                        action = 'BUY'
-                    elif 'sale' in transaction_type or 'sell' in transaction_type:
-                        action = 'SELL'
-                    else:
-                        continue
-                    
-                    # Parse date
-                    trade_date = self._parse_date(trade_date_str)
-                    if not trade_date:
-                        continue
-                    
-                    # Parse amount
-                    amount = self._parse_amount(amount_str)
-                    
-                    # Validate ticker
-                    if not self._validate_ticker(ticker):
-                        continue
-                    
-                    trades.append({
-                        'politician_name': politician_name,
-                        'ticker': ticker,
-                        'action': action,
-                        'trade_date': trade_date,
-                        'amount': amount,
-                        'disclosure_date': None,
-                        'asset_description': f"{ticker} - {transaction_type}"
-                    })
-                    
-                    if idx % 10 == 0:
-                        self._human_delay(0.5, 1.5)
+            try:
+                # Senate site typically requires searching for "Periodic Transaction Report"
+                # Try to find search form and submit for PTR reports
+                search_input = wait.until(EC.presence_of_element_located((By.ID, "reportType")))
                 
-                except Exception as e:
-                    print(f"Error parsing row: {e}")
-                    continue
+                # Select Periodic Transaction Reports if dropdown exists
+                # (This is a simplified version - actual site may need more complex interaction)
+                
+                # Look for recent filings
+                filing_links = self.driver.find_elements(By.XPATH, "//a[contains(@href, 'report')]")[:limit]
+                
+                for idx, link in enumerate(filing_links):
+                    try:
+                        filing_url = link.get_attribute('href')
+                        if filing_url:
+                            self.driver.get(filing_url)
+                            self._human_delay(2, 4)
+                            
+                            # Parse filing for transactions
+                            # (Senate uses PDF format - would need PDF parsing in production)
+                            # For now, look for any HTML transaction tables
+                            try:
+                                rows = self.driver.find_elements(By.CSS_SELECTOR, "table tr")
+                                
+                                for row in rows:
+                                    cells = row.find_elements(By.TAG_NAME, "td")
+                                    if len(cells) < 4:
+                                        continue
+                                    
+                                    asset_text = cells[0].text.strip()
+                                    transaction_type = cells[1].text.strip().lower() if len(cells) > 1 else ''
+                                    trade_date_str = cells[2].text.strip() if len(cells) > 2 else ''
+                                    amount_str = cells[3].text.strip() if len(cells) > 3 else ''
+                                    
+                                    ticker = self._extract_ticker_from_text(asset_text)
+                                    if not ticker:
+                                        continue
+                                    
+                                    if 'purchase' in transaction_type or 'buy' in transaction_type:
+                                        action = 'BUY'
+                                    elif 'sale' in transaction_type or 'sell' in transaction_type:
+                                        action = 'SELL'
+                                    else:
+                                        continue
+                                    
+                                    trade_date = self._parse_date(trade_date_str)
+                                    if not trade_date:
+                                        continue
+                                    
+                                    amount = self._parse_amount(amount_str)
+                                    
+                                    trades.append({
+                                        'politician_name': 'Senate Member',
+                                        'ticker': ticker,
+                                        'action': action,
+                                        'trade_date': trade_date,
+                                        'amount': amount,
+                                        'disclosure_date': None,
+                                        'asset_description': asset_text[:200]
+                                    })
+                            except:
+                                pass
+                            
+                            self.driver.back()
+                            self._human_delay(1, 2)
+                        
+                        if idx % 5 == 0 and idx > 0:
+                            self._human_delay(2, 4)
+                    
+                    except Exception as e:
+                        print(f"Error parsing Senate filing: {e}")
+                        continue
+                
+                return trades[:limit]
             
-            return trades
+            except Exception as e:
+                print(f"Could not access Senate filings: {e}")
+                return []
         
         except Exception as e:
             print(f"Error scraping Senate Stock Watcher: {e}")
@@ -346,6 +387,32 @@ class SeleniumStockScraper:
                 return float(re.sub(r'[^\d.]', '', clean))
         except:
             return None
+    
+    def _extract_ticker_from_text(self, text):
+        """Extract ticker symbol from asset description text."""
+        if not text:
+            return None
+        
+        # Look for ticker in parentheses: "Apple Inc. (AAPL)"
+        match = re.search(r'\(([A-Z]{1,5})\)', text)
+        if match:
+            return match.group(1)
+        
+        # Look for standalone ticker at start: "AAPL - Apple Inc."
+        match = re.search(r'^([A-Z]{1,5})\s*[-:]', text)
+        if match:
+            return match.group(1)
+        
+        # Look for any 1-5 uppercase letters surrounded by word boundaries
+        match = re.search(r'\b([A-Z]{1,5})\b', text)
+        if match:
+            ticker = match.group(1)
+            # Exclude common words that aren't tickers
+            excluded = {'INC', 'LLC', 'CORP', 'LTD', 'CO', 'LP', 'USA', 'US', 'THE', 'AND', 'OR'}
+            if ticker not in excluded:
+                return ticker
+        
+        return None
     
     def _validate_ticker(self, ticker):
         """Validate ticker symbol (1-5 uppercase letters)."""
