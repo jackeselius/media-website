@@ -1,11 +1,8 @@
 from django.core.management.base import BaseCommand
 from trading.models import Trade
-from trading.scrapers import HouseScraper, SenateScraper, clean_politician_name, validate_ticker
-from trading.selenium_scraper import SeleniumStockScraper
 from datetime import datetime
 import requests
 import os
-from bs4 import BeautifulSoup
 import json
 import re
 
@@ -26,8 +23,7 @@ class Command(BaseCommand):
         
         self.stdout.write(self.style.WARNING(f'Fetching up to {limit} recent politician trades...'))
         
-        # Primary source: Unusual Whales API (requires API key). We intentionally
-        # avoid scraping official .gov sites unless explicitly enabled via env.
+    # Primary source: QuiverQuant API via QUIVER_API_KEY. No scraping is performed.
         
         try:
             # Option 1: Capitol Trades (example endpoint - may require API key for full access)
@@ -36,7 +32,7 @@ class Command(BaseCommand):
             # Option 2: Use publicly available JSON endpoints or scrape
             # For demo purposes, using a placeholder that you'll replace with actual API
             
-            # Fetch from configured sources (Unusual Whales -> backups -> placeholder)
+            # Fetch from configured sources (QuiverQuant -> placeholder)
             trades_data = self._fetch_from_api(limit)
             
             created_count = 0
@@ -74,102 +70,20 @@ class Command(BaseCommand):
     
     def _fetch_from_api(self, limit):
         """
-        Fetch politician trades prioritizing licensed/hosted APIs and avoiding
-        scraping of official government sites unless explicitly enabled.
-        Order:
-        1) Unusual Whales API (requires UW_API_KEY)
-        2) JSON backups (community mirrors)
-        3) Optional scraping (disabled by default via GOV_SCRAPING_ENABLED)
-        4) Placeholder demo data
+        Fetch politician trades from QuiverQuant. If that fails, fall back to
+        generating a small placeholder dataset so the UI stays functional.
         """
 
-        all_trades = []
-
-        # Strategy 1: QuiverQuant API (popular and widely used)
+        # Strategy 1: QuiverQuant API (primary)
         try:
             self.stdout.write('Trying QuiverQuant API...')
             qqq_trades = self._fetch_quiver_quant(limit)
             if qqq_trades:
                 qqq_trades = [t for t in qqq_trades if self._validate_trade(t)]
-                all_trades.extend(qqq_trades)
                 self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(qqq_trades)} trades from QuiverQuant'))
-                return all_trades[:limit]
+                return qqq_trades[:limit]
         except Exception as e:
             self.stdout.write(self.style.WARNING(f'QuiverQuant failed: {str(e)}'))
-
-        # Strategy 2: Unusual Whales API
-        try:
-            self.stdout.write('Trying Unusual Whales API...')
-            uw_trades = self._fetch_unusual_whales(limit)
-            if uw_trades:
-                uw_trades = [t for t in uw_trades if self._validate_trade(t)]
-                all_trades.extend(uw_trades)
-                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(uw_trades)} trades from Unusual Whales'))
-                return all_trades[:limit]
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(f'Unusual Whales failed: {str(e)}'))
-
-        # Strategy 3: JSON API endpoints (community mirrors)
-        try:
-            self.stdout.write('Trying JSON backup endpoints...')
-            json_trades = self._try_json_apis(limit)
-            if json_trades:
-                all_trades.extend(json_trades)
-                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(json_trades)} trades from JSON backups'))
-                return all_trades[:limit]
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(f'JSON backups failed: {str(e)}'))
-
-        # Strategy 4 (optional): Scraping paths, gated by env flag
-        if os.environ.get('GOV_SCRAPING_ENABLED', 'false').lower() in ('1', 'true', 'yes'):            
-            # Selenium scrapers
-            try:
-                self.stdout.write('Fetching from House site (Selenium)...')
-                scraper = SeleniumStockScraper(headless=True)
-                house_trades = scraper.fetch_house_stock_watcher(limit=limit // 2)
-                if house_trades:
-                    house_trades = [t for t in house_trades if self._validate_trade(t)]
-                    all_trades.extend(house_trades)
-                    self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(house_trades)} trades from House (Selenium)'))
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(f'House Selenium failed: {str(e)}'))
-
-            try:
-                self.stdout.write('Fetching from Senate site (Selenium)...')
-                scraper = SeleniumStockScraper(headless=True)
-                senate_trades = scraper.fetch_senate_stock_watcher(limit=limit // 2)
-                if senate_trades:
-                    senate_trades = [t for t in senate_trades if self._validate_trade(t)]
-                    all_trades.extend(senate_trades)
-                    self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(senate_trades)} trades from Senate (Selenium)'))
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(f'Senate Selenium failed: {str(e)}'))
-
-            # Official scrapers
-            try:
-                self.stdout.write('Trying official House disclosures (requests)...')
-                house_scraper = HouseScraper()
-                house_trades = house_scraper.fetch_recent_transactions(max_records=limit // 2)
-                if house_trades:
-                    house_trades = [t for t in house_trades if self._validate_trade(t)]
-                    all_trades.extend(house_trades)
-                    self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(house_trades)} from House disclosures'))
-                    return all_trades[:limit]
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(f'House disclosures failed: {str(e)}'))
-        else:
-            self.stdout.write(self.style.WARNING('Government site scraping disabled (set GOV_SCRAPING_ENABLED=true to enable).'))
-
-        # Strategy 5: Try GitHub backup sources
-        try:
-            self.stdout.write('Trying GitHub backup sources...')
-            github_trades = self._fetch_github_data(limit)
-            if github_trades:
-                all_trades.extend(github_trades)
-                self.stdout.write(self.style.SUCCESS(f'✓ Fetched {len(github_trades)} trades from GitHub'))
-                return all_trades[:limit]
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(f'GitHub sources failed: {str(e)}'))
 
         # Fallback: Use placeholder data
         self.stdout.write(self.style.WARNING('All sources failed, using placeholder data for demo'))
@@ -295,256 +209,6 @@ class Command(BaseCommand):
             except Exception:
                 continue
         return trades
-
-    def _fetch_unusual_whales(self, limit):
-        """Fetch trades from Unusual Whales API using env vars.
-        Env:
-        - UW_API_KEY or UNUSUAL_WHALES_API_KEY
-        - UW_API_URL (optional override)
-        """
-        api_key = os.environ.get('UW_API_KEY') or os.environ.get('UNUSUAL_WHALES_API_KEY')
-        if not api_key:
-            self.stdout.write(self.style.WARNING('UW_API_KEY not set; skipping Unusual Whales.'))
-            return []
-
-        base_url = os.environ.get('UW_API_URL', 'https://api.unusualwhales.com/api/politics/trades')
-
-        # Try common auth header patterns
-        header_variants = [
-            {'Authorization': f'Bearer {api_key}'},
-            {'X-API-KEY': api_key},
-            {'x-api-key': api_key},
-        ]
-
-        params = {'limit': limit}
-
-        last_error = None
-        for hv in header_variants:
-            headers = {
-                'Accept': 'application/json',
-                'User-Agent': 'EGStudios/1.0 (+https://egmedia.org)'
-            }
-            headers.update(hv)
-            try:
-                resp = requests.get(base_url, headers=headers, params=params, timeout=30)
-                if resp.status_code != 200:
-                    last_error = f'status {resp.status_code}'
-                    continue
-                data = resp.json()
-                # Some APIs wrap data under a "data" key
-                if isinstance(data, dict) and 'data' in data:
-                    data = data['data']
-                if not isinstance(data, list):
-                    # Some endpoints may return {results: [...]} or {items: [...]} formats
-                    for key in ('results', 'items', 'trades'):
-                        if isinstance(data, dict) and key in data:
-                            data = data[key]
-                            break
-                if not isinstance(data, list):
-                    last_error = 'unexpected JSON shape'
-                    continue
-                return self._parse_unusual_whales_format(data, limit)
-            except Exception as e:
-                last_error = str(e)
-                continue
-
-        if last_error:
-            self.stdout.write(self.style.WARNING(f'Unusual Whales request failed: {last_error}'))
-        return []
-
-    def _parse_unusual_whales_format(self, data, limit):
-        """Parse Unusual Whales-like JSON into our Trade dicts with best-effort mapping."""
-        trades = []
-        for item in data[:limit]:
-            try:
-                # Ticker
-                ticker = (item.get('ticker') or item.get('symbol') or '').strip().upper()
-                if not ticker:
-                    continue
-
-                # Action
-                tx_raw = (item.get('transaction') or item.get('type') or item.get('action') or '').lower()
-                if 'purchase' in tx_raw or 'buy' in tx_raw:
-                    action = 'BUY'
-                elif 'sale' in tx_raw or 'sell' in tx_raw or 'sold' in tx_raw:
-                    action = 'SELL'
-                else:
-                    # Skip unknown actions
-                    continue
-
-                # Dates
-                date_candidates = [
-                    item.get('transaction_date'), item.get('trade_date'), item.get('date'), item.get('filed_date')
-                ]
-                trade_date = None
-                for ds in date_candidates:
-                    if not ds:
-                        continue
-                    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S'):
-                        try:
-                            trade_date = datetime.strptime(ds.split('Z')[0], fmt).date()
-                            break
-                        except Exception:
-                            continue
-                    if trade_date:
-                        break
-                if not trade_date:
-                    continue
-
-                disclosure_date = None
-                disc_candidates = [item.get('disclosure_date'), item.get('filed_date')]
-                for ds in disc_candidates:
-                    if not ds:
-                        continue
-                    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%dT%H:%M:%S'):
-                        try:
-                            disclosure_date = datetime.strptime(ds.split('Z')[0], fmt).date()
-                            break
-                        except Exception:
-                            continue
-                    if disclosure_date:
-                        break
-
-                # Amount
-                amount = None
-                amt_raw = item.get('amount') or item.get('amount_usd') or item.get('amount_range') or item.get('range')
-                if isinstance(amt_raw, (int, float)):
-                    amount = float(amt_raw)
-                elif isinstance(amt_raw, str):
-                    amt_clean = amt_raw.replace('$', '').replace(',', '').strip()
-                    if '-' in amt_clean:
-                        parts = amt_clean.split('-')
-                        try:
-                            low = float(re.sub(r'[^\d.]', '', parts[0]))
-                            high = float(re.sub(r'[^\d.]', '', parts[1]))
-                            amount = (low + high) / 2
-                        except Exception:
-                            amount = None
-                    else:
-                        try:
-                            amount = float(re.sub(r'[^\d.]', '', amt_clean))
-                        except Exception:
-                            amount = None
-
-                # Politician name
-                politician_name = (
-                    item.get('politician') or item.get('member') or item.get('representative') or item.get('senator') or 'Unknown'
-                )
-
-                trades.append({
-                    'politician_name': politician_name,
-                    'ticker': ticker,
-                    'action': action,
-                    'trade_date': trade_date,
-                    'amount': amount,
-                    'disclosure_date': disclosure_date,
-                    'asset_description': (item.get('asset_description') or item.get('asset') or '')[:200],
-                })
-            except Exception:
-                continue
-
-        return trades
-    
-    def _try_json_apis(self, limit):
-        """Try various JSON API endpoints without Selenium."""
-        urls = [
-            "https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json",
-            "https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json",
-        ]
-        
-        for url in urls:
-            try:
-                response = requests.get(url, timeout=30, headers={
-                    'User-Agent': 'Mozilla/5.0'
-                })
-                if response.status_code == 200:
-                    data = response.json()
-                    return self._parse_stock_watcher_format(data, limit, chamber='Mixed')
-            except:
-                continue
-        
-        return []
-    
-    def _parse_stock_watcher_format(self, data, limit, chamber='House'):
-        """Parse the stock watcher JSON format (works for both House and Senate)."""
-        trades = []
-        
-        for item in data[:limit]:
-            try:
-                # Parse transaction type
-                tx_type = item.get('transaction_type', item.get('type', '')).lower()
-                if 'purchase' in tx_type or 'buy' in tx_type:
-                    action = 'BUY'
-                elif 'sale' in tx_type or 'sell' in tx_type or 'sold' in tx_type:
-                    action = 'SELL'
-                else:
-                    continue
-                
-                # Get ticker
-                ticker = item.get('ticker', '').strip().upper()
-                if not ticker or ticker == '--' or ticker == 'N/A':
-                    continue
-                
-                # Parse trade date
-                trade_date = None
-                date_str = item.get('transaction_date', item.get('disclosure_date', ''))
-                if date_str:
-                    try:
-                        trade_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                    except:
-                        try:
-                            trade_date = datetime.strptime(date_str, '%m/%d/%Y').date()
-                        except:
-                            continue
-                
-                if not trade_date:
-                    continue
-                
-                # Parse disclosure date
-                disclosure_date = None
-                disc_str = item.get('disclosure_date', item.get('filed_date', ''))
-                if disc_str and disc_str != date_str:
-                    try:
-                        disclosure_date = datetime.strptime(disc_str, '%Y-%m-%d').date()
-                    except:
-                        try:
-                            disclosure_date = datetime.strptime(disc_str, '%m/%d/%Y').date()
-                        except:
-                            pass
-                
-                # Parse amount
-                amount = None
-                amt_str = item.get('amount', item.get('size', ''))
-                if amt_str:
-                    try:
-                        amt_clean = str(amt_str).replace('$', '').replace(',', '').strip()
-                        if '-' in amt_clean:
-                            parts = amt_clean.split('-')
-                            low = float(re.sub(r'[^\d.]', '', parts[0]))
-                            high = float(re.sub(r'[^\d.]', '', parts[1]))
-                            amount = (low + high) / 2
-                        else:
-                            amount = float(re.sub(r'[^\d.]', '', amt_clean))
-                    except:
-                        pass
-                
-                # Get politician name
-                politician_name = item.get('representative', item.get('senator', item.get('name', 'Unknown')))
-                
-                trades.append({
-                    'politician_name': politician_name,
-                    'ticker': ticker,
-                    'action': action,
-                    'trade_date': trade_date,
-                    'amount': amount,
-                    'disclosure_date': disclosure_date,
-                    'asset_description': item.get('asset_description', item.get('asset', ''))[:200],
-                })
-            
-            except Exception as e:
-                continue
-        
-        return trades
     
     def _validate_trade(self, trade: dict) -> bool:
         """Validate trade data before saving."""
@@ -553,11 +217,11 @@ class Command(BaseCommand):
             return False
         
         # Clean politician name
-        trade['politician_name'] = clean_politician_name(trade['politician_name'])
+        trade['politician_name'] = self._clean_politician_name(trade['politician_name'])
         
         # Validate ticker
         ticker = trade.get('ticker', '').strip().upper()
-        if not validate_ticker(ticker):
+        if not self._validate_ticker(ticker):
             return False
         trade['ticker'] = ticker
         
@@ -566,90 +230,19 @@ class Command(BaseCommand):
             return False
         
         return True
+
+    # Minimal local copies of the name/ticker validators (removed scraper deps)
+    def _clean_politician_name(self, name: str) -> str:
+        name = name.strip()
+        name = re.sub(r'\b(Rep\.|Sen\.|Representative|Senator|Hon\.)\s*', '', name, flags=re.IGNORECASE)
+        return ' '.join(name.split())
+
+    def _validate_ticker(self, ticker: str) -> bool:
+        if not ticker:
+            return False
+        ticker = ticker.strip().upper()
+        return bool(re.match(r'^[A-Z]{1,5}$', ticker))
     
-    def _fetch_github_data(self, limit):
-        """Try GitHub-hosted open data repositories."""
-        urls = [
-            'https://raw.githubusercontent.com/house-stock-watcher/house-stock-watcher/main/data/all_transactions.json',
-            'https://raw.githubusercontent.com/house-stock-watcher/house-stock-watcher/master/data/all_transactions.json',
-        ]
-        
-        for url in urls:
-            try:
-                response = requests.get(url, timeout=30)
-                if response.status_code == 200:
-                    data = response.json()
-                    trades = self._parse_house_stock_watcher(data, limit)
-                    if trades:
-                        return trades
-            except:
-                continue
-        
-        return []
-    
-    def _parse_house_stock_watcher(self, data, limit):
-        """Parse House Stock Watcher JSON format."""
-        trades = []
-        
-        for item in data[:limit]:
-            tx_type = item.get('type', '').lower()
-            if 'purchase' in tx_type:
-                action = 'BUY'
-            elif 'sale' in tx_type:
-                action = 'SELL'
-            else:
-                continue
-            
-            ticker = item.get('ticker', '').strip().upper()
-            if not ticker or ticker == '--':
-                continue
-            
-            trade_date = None
-            if item.get('transaction_date'):
-                try:
-                    trade_date = datetime.strptime(item['transaction_date'], '%Y-%m-%d').date()
-                except:
-                    try:
-                        trade_date = datetime.strptime(item['transaction_date'], '%m/%d/%Y').date()
-                    except:
-                        continue
-            
-            disclosure_date = None
-            if item.get('disclosure_date'):
-                try:
-                    disclosure_date = datetime.strptime(item['disclosure_date'], '%Y-%m-%d').date()
-                except:
-                    try:
-                        disclosure_date = datetime.strptime(item['disclosure_date'], '%m/%d/%Y').date()
-                    except:
-                        pass
-            
-            amount = None
-            amt_str = item.get('amount', '')
-            if amt_str:
-                try:
-                    amt_clean = amt_str.replace('$', '').replace(',', '').strip()
-                    if '-' in amt_clean:
-                        parts = amt_clean.split('-')
-                        low = float(parts[0].strip())
-                        high = float(parts[1].strip())
-                        amount = (low + high) / 2
-                    else:
-                        amount = float(amt_clean)
-                except:
-                    pass
-            
-            trades.append({
-                'politician_name': item.get('representative', 'Unknown'),
-                'ticker': ticker,
-                'action': action,
-                'trade_date': trade_date,
-                'amount': amount,
-                'disclosure_date': disclosure_date,
-                'asset_description': item.get('asset_description', ''),
-            })
-        
-        return trades
     
     def _generate_placeholder_data(self, limit):
         
