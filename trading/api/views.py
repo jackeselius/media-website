@@ -9,6 +9,6 @@ class TradeViewSet(viewsets.ReadOnlyModelViewSet):
     Read-only viewset for politician trades.
     Future: add POST for copy trading feature.
     """
-    queryset = Trade.objects.all()
+    queryset = Trade.objects.all().order_by('-trade_date', '-id')
     serializer_class = TradeSerializer
     permission_classes = [IsAuthenticated]
