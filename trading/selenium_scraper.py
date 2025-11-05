@@ -145,15 +145,37 @@ class SeleniumStockScraper:
             self.driver.get(url)
             self._human_delay(3, 5)  # Wait for page load
             
-            # Wait for search results or table to load
+            # Wait for page to fully load
             wait = WebDriverWait(self.driver, 15)
+            self._human_delay(2, 3)
+            
+            # Debug: Print page title and source snippet
+            print(f"Page title: {self.driver.title}")
+            print(f"Page URL: {self.driver.current_url}")
+            
+            # Save screenshot for debugging
+            try:
+                self.driver.save_screenshot('/tmp/house_disclosure_debug.png')
+                print("Screenshot saved to /tmp/house_disclosure_debug.png")
+            except:
+                pass
             
             # Try to find PTR (Periodic Transaction Report) links
             try:
+                # Look for any links first to see what's available
+                all_links = self.driver.find_elements(By.TAG_NAME, "a")
+                print(f"Found {len(all_links)} total links on page")
+                
+                # Print first 10 link texts for debugging
+                for i, link in enumerate(all_links[:10]):
+                    print(f"Link {i}: {link.text[:50]} -> {link.get_attribute('href')[:80] if link.get_attribute('href') else 'no href'}")
+                
                 # Look for recent PTR filings
-                ptr_links = wait.until(EC.presence_of_all_elements_located(
-                    (By.XPATH, "//a[contains(@href, 'ptr') or contains(text(), 'PTR')]")
-                ))[:limit]
+                ptr_links = self.driver.find_elements(
+                    By.XPATH, "//a[contains(@href, 'ptr') or contains(@href, 'PTR') or contains(text(), 'PTR') or contains(text(), 'Transaction')]"
+                )[:limit]
+                
+                print(f"Found {len(ptr_links)} PTR-related links")
                 
                 trades = []
                 
@@ -256,19 +278,42 @@ class SeleniumStockScraper:
             
             # Wait for page to load
             wait = WebDriverWait(self.driver, 15)
+            self._human_delay(2, 3)
+            
+            # Debug output
+            print(f"Page title: {self.driver.title}")
+            print(f"Page URL: {self.driver.current_url}")
+            
+            # Save screenshot
+            try:
+                self.driver.save_screenshot('/tmp/senate_disclosure_debug.png')
+                print("Screenshot saved to /tmp/senate_disclosure_debug.png")
+            except:
+                pass
             
             trades = []
             
             try:
-                # Senate site typically requires searching for "Periodic Transaction Report"
-                # Try to find search form and submit for PTR reports
-                search_input = wait.until(EC.presence_of_element_located((By.ID, "reportType")))
+                # Look for all links to understand page structure
+                all_links = self.driver.find_elements(By.TAG_NAME, "a")
+                print(f"Found {len(all_links)} total links on Senate page")
                 
-                # Select Periodic Transaction Reports if dropdown exists
-                # (This is a simplified version - actual site may need more complex interaction)
+                for i, link in enumerate(all_links[:10]):
+                    print(f"Link {i}: {link.text[:50]} -> {link.get_attribute('href')[:80] if link.get_attribute('href') else 'no href'}")
                 
-                # Look for recent filings
-                filing_links = self.driver.find_elements(By.XPATH, "//a[contains(@href, 'report')]")[:limit]
+                # Try to find report type selector or search functionality
+                try:
+                    search_input = self.driver.find_element(By.ID, "reportType")
+                    print("Found reportType element")
+                except:
+                    print("No reportType element found")
+                
+                # Look for any report-related links
+                filing_links = self.driver.find_elements(
+                    By.XPATH, "//a[contains(@href, 'report') or contains(@href, 'filing') or contains(text(), 'Report')]"
+                )[:limit]
+                
+                print(f"Found {len(filing_links)} report-related links")
                 
                 for idx, link in enumerate(filing_links):
                     try:
