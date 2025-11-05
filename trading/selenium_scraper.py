@@ -147,11 +147,31 @@ class SeleniumStockScraper:
             
             # Wait for page to fully load
             wait = WebDriverWait(self.driver, 15)
-            self._human_delay(2, 3)
+            self._human_delay(5, 8)  # Extra wait for JavaScript to execute and load content
+            
+            # Try to wait for any interactive elements
+            try:
+                wait.until(lambda d: d.execute_script('return document.readyState') == 'complete')
+                print("Page readyState is complete")
+            except:
+                pass
+            
+            # Execute JavaScript to check if page has loaded dynamic content
+            js_check = self.driver.execute_script("""
+                return {
+                    'links': document.getElementsByTagName('a').length,
+                    'tables': document.getElementsByTagName('table').length,
+                    'forms': document.getElementsByTagName('form').length,
+                    'buttons': document.getElementsByTagName('button').length,
+                    'body_text_length': document.body.innerText.length
+                };
+            """)
+            print(f"JavaScript elements check: {js_check}")
             
             # Debug: Print page title and source snippet
             print(f"Page title: {self.driver.title}")
             print(f"Page URL: {self.driver.current_url}")
+            print(f"Body text preview: {self.driver.find_element(By.TAG_NAME, 'body').text[:200]}")
             
             # Save screenshot for debugging
             try:
@@ -278,11 +298,32 @@ class SeleniumStockScraper:
             
             # Wait for page to load
             wait = WebDriverWait(self.driver, 15)
-            self._human_delay(2, 3)
+            self._human_delay(5, 8)  # Extra wait for JavaScript
+            
+            # Wait for page readyState
+            try:
+                wait.until(lambda d: d.execute_script('return document.readyState') == 'complete')
+                print("Senate page readyState is complete")
+            except:
+                pass
+            
+            # Check what elements loaded
+            js_check = self.driver.execute_script("""
+                return {
+                    'links': document.getElementsByTagName('a').length,
+                    'tables': document.getElementsByTagName('table').length,
+                    'forms': document.getElementsByTagName('form').length,
+                    'buttons': document.getElementsByTagName('button').length,
+                    'inputs': document.getElementsByTagName('input').length,
+                    'body_text_length': document.body.innerText.length
+                };
+            """)
+            print(f"Senate JavaScript elements check: {js_check}")
             
             # Debug output
             print(f"Page title: {self.driver.title}")
             print(f"Page URL: {self.driver.current_url}")
+            print(f"Body text preview (pre-accept): {self.driver.find_element(By.TAG_NAME, 'body').text[:200]}")
             
             # Save screenshot
             try:
@@ -294,25 +335,68 @@ class SeleniumStockScraper:
             trades = []
             
             try:
+                # Attempt to accept the disclosure terms to unlock search
+                try:
+                    # Check the agreement checkbox
+                    checkbox = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "input[type='checkbox']")))
+                    self.driver.execute_script("arguments[0].click();", checkbox)
+                    self._human_delay(0.5, 1.0)
+                    print("Checked the Senate disclosure agreement checkbox")
+                except Exception as e:
+                    print(f"No checkbox interacted: {e}")
+                
+                # Click the Get Access button (or any button present)
+                try:
+                    # Prefer a button containing the text 'Get Access'
+                    buttons = self.driver.find_elements(By.XPATH, "//button[contains(., 'Get Access') or contains(., 'Access') or contains(., 'Search')]")
+                    if buttons:
+                        self.driver.execute_script("arguments[0].click();", buttons[0])
+                        print("Clicked Get Access/Search button")
+                    else:
+                        # Try any enabled button
+                        any_buttons = self.driver.find_elements(By.TAG_NAME, 'button')
+                        if any_buttons:
+                            self.driver.execute_script("arguments[0].click();", any_buttons[0])
+                            print("Clicked a generic button on Senate page")
+                    self._human_delay(2, 3)
+                except Exception as e:
+                    print(f"No button clicked: {e}")
+                
+                # After acceptance, re-check the DOM and links
+                js_check_after = self.driver.execute_script("""
+                    return {
+                        'links': document.getElementsByTagName('a').length,
+                        'tables': document.getElementsByTagName('table').length,
+                        'forms': document.getElementsByTagName('form').length,
+                        'buttons': document.getElementsByTagName('button').length,
+                        'inputs': document.getElementsByTagName('input').length,
+                        'body_text_length': document.body.innerText.length
+                    };
+                """)
+                print(f"Senate elements after accept: {js_check_after}")
+                print(f"Body text preview (post-accept): {self.driver.find_element(By.TAG_NAME, 'body').text[:200]}")
+                
                 # Look for all links to understand page structure
                 all_links = self.driver.find_elements(By.TAG_NAME, "a")
-                print(f"Found {len(all_links)} total links on Senate page")
+                print(f"Found {len(all_links)} total links on Senate page (post-accept)")
+                for i, link in enumerate(all_links[:15]):
+                    href = link.get_attribute('href')
+                    print(f"Link {i}: {link.text[:60]} -> {href[:100] if href else 'no href'}")
                 
-                for i, link in enumerate(all_links[:10]):
-                    print(f"Link {i}: {link.text[:50]} -> {link.get_attribute('href')[:80] if link.get_attribute('href') else 'no href'}")
-                
-                # Try to find report type selector or search functionality
+                # Try to navigate to any search page discovered
                 try:
-                    search_input = self.driver.find_element(By.ID, "reportType")
-                    print("Found reportType element")
-                except:
-                    print("No reportType element found")
+                    search_links = [l for l in all_links if (l.get_attribute('href') or '').find('/search/') != -1]
+                    if search_links:
+                        self.driver.execute_script("arguments[0].click();", search_links[0])
+                        self._human_delay(2, 3)
+                        print("Navigated to a search-related link")
+                except Exception as e:
+                    print(f"Could not navigate to search link: {e}")
                 
                 # Look for any report-related links
                 filing_links = self.driver.find_elements(
-                    By.XPATH, "//a[contains(@href, 'report') or contains(@href, 'filing') or contains(text(), 'Report')]"
+                    By.XPATH, "//a[contains(@href, 'report') or contains(@href, 'filing') or contains(text(), 'Report') or contains(text(), 'Disclosure')]"
                 )[:limit]
-                
                 print(f"Found {len(filing_links)} report-related links")
                 
                 for idx, link in enumerate(filing_links):
