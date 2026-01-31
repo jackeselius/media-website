@@ -88,38 +88,38 @@ const router = createBrowserRouter([
 
 const theme = createTheme({
   colorScheme: 'dark',
-  primaryColor: 'green',
+  primaryColor: 'blue',
   colors: {
-    // Neon green custom palette
-    green: [
-      '#e6ffe6',
-      '#ccffcc',
-      '#99ff99',
-      '#66ff66',
-      '#33ff33',
-      '#00ff00', // neon green base
-      '#00cc00',
-      '#009900',
-      '#006600',
-      '#003300',
+    // Blue custom palette
+    blue: [
+      '#e6f2ff',
+      '#ccebff',
+      '#99d7ff',
+      '#66c3ff',
+      '#33afff',
+      '#0099ff', // blue base
+      '#0077cc',
+      '#005599',
+      '#003366',
+      '#001133',
     ],
   },
   defaultRadius: 'md',
   components: {
     Button: {
       defaultProps: {
-        color: 'green',
+        color: 'blue',
       },
     },
     NavLink: {
       styles: {
         root: {
           '&[data-active]': {
-            backgroundColor: 'rgba(0, 255, 0, 0.1)',
-            borderLeft: '3px solid #00ff00',
+            backgroundColor: 'rgba(0, 153, 255, 0.1)',
+            borderLeft: '3px solid #0099ff',
           },
           '&:hover': {
-            backgroundColor: 'rgba(0, 255, 0, 0.05)',
+            backgroundColor: 'rgba(0, 153, 255, 0.05)',
           },
         },
       },
